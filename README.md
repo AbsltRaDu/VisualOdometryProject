@@ -1,0 +1,1 @@
+Датасет: https://projects.asl.ethz.ch/datasets/euroc-mav/
