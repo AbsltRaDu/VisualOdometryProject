@@ -88,14 +88,24 @@ class DeepVO:
         
     @torch.no_grad() # Вырубаем градиенты для шага
     def step(self, x_pair):
+        
+        self.encoder.eval()
+        self.rnn_model.eval()
+        
         x_pair = x_pair.to(self.device) # (B, C, H, W)
         x = self.encoder(x_pair).cpu() # (B, C)
         self.buffer.append(x) # [(B, c)]
         
         if len(self.buffer) < self.seq_len:
-            return None
-        
-        x_seq = torch.stack((list(self.buffer)), dim=0).transpose(0, 1).to(self.device) # (seq, B, C) -> (B, seq, C)
-        y = self.rnn_model(x_seq) # (1, 6)
-        return y.squeeze(0).cpu() # (6)
-        
+            n = self.seq_len - len(self.buffer)
+            z = torch.zeros((n, x.shape[0], x.shape[1])).to(self.device)
+            x_seq = torch.stack((list(self.buffer)), dim=0).to(self.device) # (seq, B, C) -> (B, seq, C)
+            x_seq = torch.vstack([z, x_seq]).transpose(0, 1)
+            y = self.rnn_model(x_seq) # (1, 6)
+
+            return y.squeeze(0).cpu() # (6)
+        else:
+            x_seq = torch.stack((list(self.buffer)), dim=0).transpose(0, 1).to(self.device) # (seq, B, C) -> (B, seq, C)
+            y = self.rnn_model(x_seq) # (1, 6)
+
+            return y.squeeze(0).cpu() # (6)
