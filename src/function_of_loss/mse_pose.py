@@ -19,3 +19,16 @@ class PoseLoss(nn.Module):
         r_loss = self.mse(pred_eul, fact_eul)
         
         return pos_loss + self.k * r_loss
+    
+class PoseLossTrajectory(PoseLoss):
+    
+    def __init__(self, k: float = 100, reduction: str = 'mean'):
+        super().__init__(self, k=k, reduction=reduction)
+        
+    def forward(self, y_pred: torch.Tensor, y_fact: torch.Tensor):
+        '''
+        y_pred.size = (B, S, Dim)
+        '''
+        pass
+
+     

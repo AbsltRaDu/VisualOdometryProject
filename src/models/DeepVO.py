@@ -55,7 +55,31 @@ class PairwiseVOModel(nn.Module): # Модель для обучения эко�
         return self.fc(x) # (B, 6)
 
 class DeepVORNN(nn.Module):
-    def __init__(self, feat_dim=1024, hidden_size=64, num_layers=2, pose_dim=6, dropout=0.3):
+    def __init__(self, feat_dim=1024, hidden_size=1000, num_layers=2, pose_dim=6, dropout=0.3):
+        super().__init__()
+        
+        self.rnn = nn.LSTM(
+            input_size=feat_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout if num_layers > 1 else 0,
+            batch_first=True
+        )
+        
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_size, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(256, pose_dim)
+        )
+        
+    def forward(self, x, hidden=None):
+        out, hidden = self.rnn(x, hidden) # out.size = (B, S, H)
+        y = self.fc(out) # (B, S, D)
+        return y
+    
+class DeepVORNN(nn.Module):
+    def __init__(self, feat_dim=1024, hidden_size=1000, num_layers=2, pose_dim=6, dropout=0.3):
         super().__init__()
         
         self.rnn = nn.LSTM(
