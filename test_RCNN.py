@@ -18,7 +18,7 @@ print('Обучение на:', device, sep=' ')
 transform = T.Compose([
     T.Resize((320, 192))
 ])
-dataset_train = mavDataLoader('datasets/euroc_mav', transform=transform, lst_of_datasets=['mav0_vic2'])
+dataset_train = mavDataLoader('datasets/euroc_mav', transform=transform, lst_of_datasets=['mav0_vic1'])
 
 print('Длина датасета:', len(dataset_train), sep=' ')
 
