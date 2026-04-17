@@ -55,7 +55,31 @@ class PairwiseVOModel(nn.Module): # Модель для обучения эко�
         return self.fc(x) # (B, 6)
 
 class DeepVORNN(nn.Module):
-    def __init__(self, feat_dim=1024, hidden_size=64, num_layers=2, pose_dim=6, dropout=0.3):
+    def __init__(self, feat_dim=1024, hidden_size=1000, num_layers=2, pose_dim=6, dropout=0.3):
+        super().__init__()
+        
+        self.rnn = nn.LSTM(
+            input_size=feat_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout if num_layers > 1 else 0,
+            batch_first=True
+        )
+        
+        self.fc = nn.Sequential(
+            nn.Linear(hidden_size, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(256, pose_dim)
+        )
+        
+    def forward(self, x, hidden=None):
+        out, hidden = self.rnn(x, hidden) # out.size = (B, S, H)
+        y = self.fc(out) # (B, S, D)
+        return y
+    
+class DeepVORNN(nn.Module):
+    def __init__(self, feat_dim=1024, hidden_size=1000, num_layers=2, pose_dim=6, dropout=0.3):
         super().__init__()
         
         self.rnn = nn.LSTM(
@@ -88,14 +112,24 @@ class DeepVO:
         
     @torch.no_grad() # Вырубаем градиенты для шага
     def step(self, x_pair):
+        
+        self.encoder.eval()
+        self.rnn_model.eval()
+        
         x_pair = x_pair.to(self.device) # (B, C, H, W)
         x = self.encoder(x_pair).cpu() # (B, C)
         self.buffer.append(x) # [(B, c)]
         
         if len(self.buffer) < self.seq_len:
-            return None
-        
-        x_seq = torch.stack((list(self.buffer)), dim=0).transpose(0, 1).to(self.device) # (seq, B, C) -> (B, seq, C)
-        y = self.rnn_model(x_seq) # (1, 6)
-        return y.squeeze(0).cpu() # (6)
-        
+            n = self.seq_len - len(self.buffer)
+            z = torch.zeros((n, x.shape[0], x.shape[1])).to(self.device)
+            x_seq = torch.stack((list(self.buffer)), dim=0).to(self.device) # (seq, B, C) -> (B, seq, C)
+            x_seq = torch.vstack([z, x_seq]).transpose(0, 1)
+            y = self.rnn_model(x_seq) # (1, 6)
+
+            return y.squeeze(0).cpu() # (6)
+        else:
+            x_seq = torch.stack((list(self.buffer)), dim=0).transpose(0, 1).to(self.device) # (seq, B, C) -> (B, seq, C)
+            y = self.rnn_model(x_seq) # (1, 6)
+
+            return y.squeeze(0).cpu() # (6)
