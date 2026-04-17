@@ -27,7 +27,7 @@ def training(train_data, test_data, model, loss_func, optimizer, epochs, device,
         
         model.train()
         
-        for x_train, y_train in train_bar:
+        for x_train, y_train, T_m in train_bar:
             x_train = x_train.to(device) 
             y_train = y_train.to(device) 
             
@@ -53,7 +53,7 @@ def training(train_data, test_data, model, loss_func, optimizer, epochs, device,
         
         lm_count = 0
         
-        for x_val, y_val in val_bar:
+        for x_val, y_val, _ in val_bar:
             x_val = x_val.to(device) 
             y_val = y_val.to(device) 
             

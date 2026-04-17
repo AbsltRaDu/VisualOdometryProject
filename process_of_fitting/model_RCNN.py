@@ -41,12 +41,13 @@ model = PairwiseVOModel()
 model.load_state_dict(state_dict)
 model_cnn = model.encoder.to(device)
 
-hidden_size = 64
+seq_len = 64
+hidden_size = 1000
 model_rcnn = DeepVORNN(hidden_size=hidden_size)
 model_rcnn = model_rcnn.to(device)
 
-tensor_of_x, tensor_of_y = get_tensors_of_x_y(train_data, model_cnn, device) # Получаем вектора представлений x CNN и единый тензор y
-dataset_r = dataloaderRCNN(tensor_of_x, tensor_of_y, hidden_size, dataset_groups)
+tensor_of_x, tensor_of_y, tensor_of_T = get_tensors_of_x_y(train_data, model_cnn, device) # Получаем вектора представлений x CNN и единый тензор y
+dataset_r = dataloaderRCNN(tensor_of_x, tensor_of_y, seq_len, dataset_groups)
 train_data = data.DataLoader(dataset_r, batch_size=8, num_workers=0, pin_memory=True)
 test_data = data.DataLoader(dataset_r, batch_size=8, num_workers=0, pin_memory=True)
 

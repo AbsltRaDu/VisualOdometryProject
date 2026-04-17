@@ -3,10 +3,11 @@ import torch.nn as nn
 from torch.utils import data
 
 class dataloaderRCNN(data.Dataset):
-    def __init__(self, tensor_x, tensor_y, seq_length, groups):
+    def __init__(self, tensor_x, tensor_y, tensor_of_T, seq_length, groups):
         self.seq_length = seq_length
         self.X = tensor_x
         self.Y = tensor_y
+        self.T = tensor_of_T
         
         self.windows = []
         
@@ -26,8 +27,10 @@ class dataloaderRCNN(data.Dataset):
     def __getitem__(self, item):
         windows = self.windows[item]
         x_seq = self.X[windows].clone()
-        y = self.Y[windows[-1]].clone()
-        return x_seq, y
+        y_seq = self.Y[windows].clone()
+        T_seq = self.T[windows].clone()
+        
+        return x_seq, y_seq, T_seq
     
     def __len__(self):
         return self.length
