@@ -224,5 +224,3 @@ class mavDatasetCNN_3D(mavDataLoader):
         angles = dr.as_euler()
         
         return torch.cat((delt_p, angles), dim=0), T1
-
-    
