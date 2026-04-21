@@ -14,7 +14,8 @@ from torchvision import transforms as T
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-from src.different_functions.RotationTorch import RotationTorch as RT
+from src.geometry.RotationTorch import RotationTorch as RT
+from src.geometry.PoseTorch import PoseTorch as PT
 
 class mavDataLoader(data.Dataset):
 
@@ -66,8 +67,9 @@ class mavDataLoader(data.Dataset):
 
             lst_target = []
             for coord1, coord2 in zip(lst_target_coord[:-1], lst_target_coord[1:]):
-                p_coord1, q_coord1, p_coord2, q_coord2 = torch.tensor(coord1[:3], dtype=torch.float32), torch.tensor(coord1[3:], dtype=torch.float32), torch.tensor(coord2[:3], dtype=torch.float32), torch.tensor(coord2[3:], dtype=torch.float32)
-                y, T_m = self.get_delta_quat(q_coord1, q_coord2, p_coord2, p_coord1)
+                p_coord1, q_coord1 = torch.tensor(coord1[:3], dtype=torch.float64), torch.tensor(coord1[3:], dtype=torch.float64)
+                p_coord2, q_coord2 = torch.tensor(coord2[:3], dtype=torch.float64), torch.tensor(coord2[3:], dtype=torch.float64)
+                y, T_m = self.get_delta_quat(q_coord1, q_coord2, p_coord1, p_coord2)
                 lst_target.append((y, T_m))
                 
             lst_x1 = list(zip(lst_cam0[:-1], lst_cam0[1:]))
@@ -176,7 +178,7 @@ class mavDataLoader(data.Dataset):
         r1 = R.from_quat(q1_xyzw) # созадние объекта ориентации
         r2 = R.from_quat(q2_xyzw)
         
-        r1m = torch.tensor(r1.as_matrix(), dtype=torch.float32) # Создание ориентации 1 кадра
+        r1m = torch.tensor(r1.as_matrix(), dtype=torch.float64) # Создание ориентации 1 кадра
         T1 = self.get_motion_matrix(r1m, p1)
         delt_p = r1m.T @ (p1-p2)
         
@@ -184,7 +186,7 @@ class mavDataLoader(data.Dataset):
         dq_matrix = dr.as_matrix() # Выводим поворот уже в виде матрицы, а не кватериона
         angles = dr.as_euler('xyz', degrees=False) # Вытаскиваем углы Эйлера в радианах
         
-        return torch.cat((delt_p, torch.tensor(angles, dtype=torch.float32)), dim=0), T1
+        return torch.cat((delt_p, torch.tensor(angles, dtype=torch.float64)), dim=0), T1
     
     def __len__(self):
         return self.length
@@ -213,14 +215,11 @@ class mavDatasetCNN_3D(mavDataLoader):
     def __init__(self, path, transform=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
         super().__init__(path, transform=transform, device=device, batchsize=batchsize, hidden_size=hidden_size, lst_of_datasets=lst_of_datasets)
         
-    def get_delta_quat(self, q1, q2, p1, p2):
-        r1 = RT.from_quat(q1)
-        r2 = RT.from_quat(q2)
+    def get_delta_quat(self, q1: torch.Tensor, q2: torch.Tensor, p1: torch.Tensor, p2: torch.Tensor): # Ф-ия поиска определения углой эйлера из кватерионов + определение прирощения позы
         
-        T1 = self.get_motion_matrix(r1, p1)
-        delt_p = r1.inv().apply(p1 - p2)
+        pose1 = PT.from_rt(RT.from_quat(q1), p1)
+        pose2 = PT.from_rt(RT.from_quat(q2), p2)
         
-        dr = r2 * r1.inv()
-        angles = dr.as_euler()
+        delta_pose = pose1.inv() * pose2
         
-        return torch.cat((delt_p, angles), dim=0), T1
+        return delta_pose.as_lie(), pose1.as_lie()
