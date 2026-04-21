@@ -10,3 +10,8 @@ process_of_fitting/fitting_models
 ```
 process_of_fitting/result_of_fitting
 ```
+
+Скрипты тестирования и 3D визуализации: 
+```
+Тесты и визуализации
+```
