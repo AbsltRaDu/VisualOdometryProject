@@ -14,6 +14,8 @@ from torchvision import transforms as T
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
+from src.different_functions.RotationTorch import RotationTorch as RT
+
 class mavDataLoader(data.Dataset):
 
     def __init__(self, path, transform=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
@@ -202,4 +204,25 @@ class SequenceBatchSampler(data.Sampler):
 
     def __len__(self):
         return len(self.batch_groups)
+    
+class mavDatasetCNN_3D(mavDataLoader):
+    '''
+    Датасет для CNN но с геометрией из PyTorch3D на самописной RotationTorch - аналоге Rotation из SciPy для работы на CUDA
+    '''
+    
+    def __init__(self, path, transform=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
+        super().__init__(path, transform=transform, device=device, batchsize=batchsize, hidden_size=hidden_size, lst_of_datasets=lst_of_datasets)
+        
+    def get_delta_quat(self, q1, q2, p1, p2):
+        r1 = RT.from_quat(q1)
+        r2 = RT.from_quat(q2)
+        
+        T1 = self.get_motion_matrix(r1, p1)
+        delt_p = r1.inv().apply(p1 - p2)
+        
+        dr = r2 * r1.inv()
+        angles = dr.as_euler()
+        
+        return torch.cat((delt_p, angles), dim=0), T1
+
     
