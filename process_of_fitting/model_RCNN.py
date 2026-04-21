@@ -12,7 +12,7 @@ from src.dataloaders.dataloader_for_RCNN import dataloaderRCNN
 from src.models.DeepVO import PairwiseVOModel, DeepVORNN
 from src.function_of_loss.mse_pose import PoseLoss
 from src.piplines.pipline_for_RCNN import training
-from src.different_functions.get_tensors_of_x_y import get_tensors_of_x_y
+from src.geometry.get_tensors_of_x_y import get_tensors_of_x_y
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Обучение на:', device, sep=' ')

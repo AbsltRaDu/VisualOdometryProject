@@ -1,7 +1,10 @@
 import torch
+import pytorch3d.transforms as torch3d
+
 from dataclasses import dataclass
 
-from src.different_functions.RotationTorch import RotationTorch
+from src.geometry.RotationTorch import RotationTorch
+
 
 @dataclass
 class PoseTorch:
@@ -40,8 +43,65 @@ class PoseTorch:
         R = RotationTorch.from_matrix(R_matrix)
         
         return cls(R, t)
+    
+    @staticmethod
+    def se3_to_pytorch3d(T: torch.Tensor) -> torch.Tensor:
+        '''
+        Переводит SE(3)-матрицу из стандартной формы:
+            [ R t ]
+            [ 0 1 ]
+        в формат PyTorch3D:
+            [ R 0 ]
+            [ t 1 ]
+        '''
         
+        T_p3d = torch.zeros_like(T)
+        T_p3d[..., :3, :3] = T[..., :3, :3]
+        T_p3d[..., 3, :3] = T[..., :3, 3]
+        T_p3d[..., 3, 3] = 1.0
+        return T_p3d
         
+    @staticmethod
+    def se3_from_pytorch3d(T_p3d: torch.Tensor) -> torch.Tensor:
+        '''
+        Переводит матрицу из формата PyTorch3D:
+            [ R 0 ]
+            [ t 1 ]
+        в стандартную форму:
+            [ R t ]
+            [ 0 1 ]
+        '''
+        
+        T = torch.zeros_like(T_p3d)
+        T[..., :3, :3] = T_p3d[..., :3, :3]
+        T[..., :3, 3] = T_p3d[..., 3, :3]
+        T[..., 3, 3] = 1
+        
+        return T
+    
+    @classmethod
+    def from_lie(cls, xi: torch.Tensor, eps: float = 1e-4) -> 'PoseTorch':
+        '''
+        Создание позы из элемента алгебры Ли
+        
+        xi: 6-мерный вектор [rho_x, rho_y, rho_z, phi_x, phi_y, phi_z], где
+        rho - логарифм трансляции
+        phi - логарифм вращения
+        '''
+        
+        if xi.shape[-1] != 6:
+            raise ValueError('Элемент алгебры Ли должен иметь размерность (..., 6)')
+        
+        batch_shape = xi.shape[:-1]
+        xi_flat = xi.reshape(-1, 6)
+        
+        T_flat = torch3d.se3_exp_map(xi_flat, eps=eps) # Экспоненциальное отображение se(3) -> SE(3)
+        T_p3d = T_flat.reshape(*batch_shape, 4, 4)
+        
+        T = cls.se3_from_pytorch3d(T_p3d)
+        
+        return cls.from_matrix(T)
+    
     def as_matrix(self) -> torch.Tensor:
         '''
         Возвращает матрицу преобразований SE(3)
@@ -55,6 +115,23 @@ class PoseTorch:
         T[..., 3, 3] = 1
         
         return T
+    
+    def as_lie(self, eps: float = 1e-4, cos_bound: float = 1e-4) -> torch.Tensor:
+        '''
+        Возвращает позу в виде элемента алгебры Ли se(3)
+        '''
+        
+        T = self.as_matrix()
+        T_p3d = self.se3_to_pytorch3d(T)
+        
+        batch_shape = T_p3d.shape[:-2]
+        T_flat = T_p3d.reshape(-1, 4, 4)
+        
+        xi_flat = torch3d.se3_log_map(T_flat, eps=eps, cos_bound=cos_bound) # Логарифммическое отображение SE(3) -> se(3)
+        
+        xi = xi_flat.reshape(*batch_shape, 6)
+        
+        return xi
     
     def rotation(self) -> RotationTorch:
         '''
