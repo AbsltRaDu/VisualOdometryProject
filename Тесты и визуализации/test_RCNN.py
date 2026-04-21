@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from src.dataloaders.dataloader_for_CNN import mavDataLoader
 from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
 from src.models.DeepVO import DeepVO, PairwiseVOModel, DeepVORNN
-from src.different_functions.trigan import euler_to_matrix_R, get_motion_matrix
+from src.geometry.trigan import euler_to_matrix_R, get_motion_matrix
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Обучение на:', device, sep=' ')

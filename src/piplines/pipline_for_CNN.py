@@ -6,7 +6,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from src.metrics.KITTI_metrics import translation_rmse_drift, rotation_rmse_drift
-from src.different_functions.trigan import R_mat_to_euler_and_pose, euler_to_matrix_R, get_motion_matrix
+from src.geometry.trigan import R_mat_to_euler_and_pose, euler_to_matrix_R, get_motion_matrix
 
 def training(train_data, test_data, model, loss_func, optimizer, epochs, device, name_of_model, squueze=False):
     best_score = 10**10
