@@ -213,7 +213,12 @@ class RotationTorch:
         return self._q.shape[:-1] # возвращается только батчева форма размерности, то есть размер кватерниона игнориируется
     
     def __getitem__(self, item):
-        return self.q[..., item, :]
+        
+        if self._q.ndim >= 2:
+            return RotationTorch.from_quat(self._q[..., item, :])
+        
+        else:
+            raise ValueError('Данный объект RotationTorch не итерируемый')
     
         
         
