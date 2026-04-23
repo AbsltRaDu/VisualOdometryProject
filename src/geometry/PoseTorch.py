@@ -14,6 +14,9 @@ class PoseTorch:
     Представляет преобразования вида:
         T = [ R t ]
             [ 0 1 ]
+            
+    ВАЖНО: Для корректной работы лучше использовать dtype=float64,
+    потому что float32 может приводить к потере информации при округлении
     
     '''
     
@@ -208,6 +211,44 @@ class PoseTorch:
         
         return PoseTorch(self.R, self.t.to(*args, **kwargs))
     
+    @classmethod
+    def stack(cls, poses: list['PoseTorch'], dim: int = 0) -> 'PoseTorch':
+        '''
+        Аналог torch.stack для объектов PoseTorch
+        '''
+        
+        if len(poses) == 0:
+            raise ValueError('Нельзя выполнять stack для пустого списка PoseTorch')
+        
+        if not all(isinstance(p, PoseTorch) for p in poses):
+            raise TypeError('Все элементы списка должны быть объектами PoseTorch')
+        
+        R_quats = torch.stack([p.R.as_quat() for p in poses], dim=dim)
+        t = torch.stack([p.t for p in poses], dim=dim)
+        
+        R = poses[0].R.__class__.from_quat(R_quats)
+        
+        return cls.from_rt(R, t)
+    
+    @classmethod
+    def cat(cls, poses: list['PoseTorch'], dim: int = 0) -> 'PoseTorch':
+        '''
+        Аналог torch.cat для объектов PoseTorch
+        '''
+        
+        if len(poses) == 0:
+            raise ValueError('Нельзя выполнять stack для пустого списка PoseTorch')
+        
+        if not all(isinstance(p, PoseTorch) for p in poses):
+            raise TypeError('Все элементы списка должны быть объектами PoseTorch')
+        
+        R_quats = torch.cat([p.R.as_quat() for p in poses], dim=dim)
+        t = torch.cat([p.t for p in poses], dim=dim)
+        
+        R = poses[0].R.__class__.from_quat(R_quats)
+        
+        return cls.from_rt(R, t)
+        
     @property
     def device(self):
         
@@ -216,7 +257,13 @@ class PoseTorch:
     @property
     def dtype(self):
         return self.t.dtype
+    
+    def __getitem__(self, item):
         
+        R = self.R[item]
+        t = self.t[..., item, :]
+        
+        return PoseTorch.from_rt(R, t)
         
         
     

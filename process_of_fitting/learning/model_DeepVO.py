@@ -11,7 +11,7 @@ from src.dataloaders.dataloader_for_CNN import mavDataLoader, SequenceBatchSampl
 from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
 from src.models.DeepVO import DeepVO
 from src.function_of_loss.mse_pose import PoseLoss
-from src.piplines.pipline_for_CNN import training
+from piplines.pipline_learning_NN import training
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Обучение на:', device, sep=' ')
@@ -21,8 +21,6 @@ transform = T.Compose([
     T.Resize((320, 192))
 ])
 dataset = mavDataLoader('datasets/euroc_mav', transform, device='cpu', batchsize=4, hidden_size=8, lst_of_datasets=['mav0_easy1']) # Сразу формируем все массивы на GPU
-
-train_size = int(0.005 * len(dataset))
 
 groups = dataset.batch_groups.copy()
 

@@ -10,7 +10,7 @@ from torch.utils.data import Subset
 from src.dataloaders.dataloader_for_CNN import mavDataLoader, SequenceBatchSampler
 from src.models.DeepVO import PairwiseVOModel
 from src.function_of_loss.mse_pose import PoseLoss
-from src.piplines.pipline_for_CNN import training
+from piplines.pipline_learning_NN import training
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Обучение на:', device, sep=' ')

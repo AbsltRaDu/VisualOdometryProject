@@ -103,6 +103,18 @@ class RotationTorch:
         q = matrix_to_quaternion(R)
         return cls(q)
     
+    @classmethod
+    def identity(cls, batch_shape=(), device=None, dtype=None) -> 'RotationTorch':
+        '''
+        Инициализация единичного вращения
+        '''
+        
+        z = torch.zeros(*batch_shape, 4, device=device, dtype=dtype)
+        z[..., 0] = 1
+
+        return cls.from_quat(z)
+    
+    
     def as_quat(self) -> torch.Tensor:
         '''
         Возвращение копии объекта класса-кватерниона в виде кватерниона
@@ -199,7 +211,10 @@ class RotationTorch:
     @property
     def shape(self):
         return self._q.shape[:-1] # возвращается только батчева форма размерности, то есть размер кватерниона игнориируется
-        
+    
+    def __getitem__(self, item):
+        return self.q[..., item, :]
+    
         
         
         
