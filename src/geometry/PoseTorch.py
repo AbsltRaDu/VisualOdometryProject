@@ -260,10 +260,15 @@ class PoseTorch:
     
     def __getitem__(self, item):
         
-        R = self.R[item]
-        t = self.t[..., item, :]
+        if self.t.ndim >= 2:
         
-        return PoseTorch.from_rt(R, t)
+            R = self.R[item]
+            t = self.t[..., item, :]
+            
+            return PoseTorch.from_rt(R, t)
+        
+        else:
+            raise ValueError('Данный объект PoseTroch не итерируемый')
         
         
     
