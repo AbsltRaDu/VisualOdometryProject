@@ -15,10 +15,10 @@ class PoseLoss(nn.Module):
         fact_p = y_fact[:, :3]
         fact_eul = y_fact[:, 3:]
         
-        pos_loss = self.mse(pred_p, fact_p)
-        r_loss = self.mse(pred_eul, fact_eul)
+        self.pos_loss = self.mse(pred_p, fact_p)
+        self.r_loss = self.mse(pred_eul, fact_eul)
         
-        return pos_loss + self.k * r_loss
+        return self.pos_loss + self.k * self.r_loss
     
 class PoseLossTrajectory(PoseLoss):
     
