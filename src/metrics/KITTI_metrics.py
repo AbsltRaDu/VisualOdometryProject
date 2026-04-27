@@ -8,6 +8,7 @@ def rotation_rmse_drift(r_pred, r_fact, path_lenght):
     drift = torch.linalg.norm(r_pred - r_fact) 
     return torch.mean(drift / path_lenght) * 100
 
+
 def rmse_pos(p_pred: torch.Tensor, p_fact: torch.Tensor) -> torch.Tensor:
     '''
     RMSE по координатам
