@@ -258,6 +258,12 @@ class PoseTorch:
     def dtype(self):
         return self.t.dtype
     
+    def __len__(self):
+        if self.t.ndim > 1:
+            return self.t.shape[-2]
+        else:
+            return 1
+    
     def __getitem__(self, item):
         
         if self.t.ndim >= 2:
