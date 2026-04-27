@@ -9,11 +9,11 @@ class PoseLoss(nn.Module):
         
     def forward(self, y_pred: torch.Tensor, y_fact: torch.Tensor):
         
-        pred_p = y_pred[:, :3]
-        pred_eul = y_pred[:, 3:]
+        pred_p = y_pred[..., :3]
+        pred_eul = y_pred[..., 3:]
         
-        fact_p = y_fact[:, :3]
-        fact_eul = y_fact[:, 3:]
+        fact_p = y_fact[..., :3]
+        fact_eul = y_fact[..., 3:]
         
         self.pos_loss = self.mse(pred_p, fact_p)
         self.r_loss = self.mse(pred_eul, fact_eul)

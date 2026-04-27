@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from src.geometry.PoseTorch import PoseTorch
+from src.geometry.RotationTorch import RotationTorch
 
 @dataclass
 class TrajectoryTorch:
@@ -124,4 +125,178 @@ class TrajectoryTorch:
         
         last_pose = self.last_pose()
         
+        if keep_history:
+            trajectory = self.from_relative(deltas, last_pose)
+            trajectory = TrajectoryTorch.cat([TrajectoryTorch.from_absolute(self.poses[:-1]), trajectory], dim=-2)
+        else:
+            trajectory = self.from_relative(deltas, last_pose)
         
+        return trajectory
+    
+    def extend_martices_relative(self, poses: torch.Tensor, keep_history: bool = True) -> 'TrajectoryTorch':
+        '''
+        Продолжает накполенную траектори, добавляя относительные преобразования в матричном представлении
+        '''
+        
+        deltas = PoseTorch.from_matrix(poses)
+        
+        return self.extend_relative(deltas, keep_history)
+    
+    def extend_lie_relative(self, xi_seq: torch.Tensor, keep_history: bool = True) -> 'TrajectoryTorch':
+        '''
+        Продолжает накполенную траектори, добавляя относительные преобразования в матричном представлении
+        '''
+        
+        deltas = PoseTorch.from_lie(xi_seq)
+        
+        return self.extend_relative(deltas, keep_history)
+    
+    def as_pose(self) -> PoseTorch:
+        '''
+        Возвращает траекторию, как объекты PoseTorch
+        '''
+        
+        return self.poses.clone()
+    
+    def as_matrices(self) -> torch.Tensor:
+        '''
+        Возвращает траекторию, как тензор мамтриц поз
+        '''
+        
+        return self.poses.as_matrix()
+        
+    
+    def as_lie(self) -> torch.Tensor:
+        '''
+        Возвращает траекторию, в представлении алгебры Ли
+        '''
+        
+        return self.poses.as_lie()
+        
+        
+    def positions(self) -> torch.Tensor:
+        '''
+        Возвращает только координаты центров поз
+        '''
+        
+        return self.poses.translation()
+    
+    def rotations(self) -> RotationTorch:
+        '''
+        Вовзращает объекты вращений RotationTorch
+        '''
+        
+        return self.poses.rotation()
+    
+    def relative_deltas(self) -> PoseTorch:
+        '''
+        Вычисляет последовательность относительных движений между соседними позами
+        '''
+        
+        deltas = [pose0.inv() * pose1 for pose0, pose1 in  zip(self.poses[:-1], self.poses[1:])]
+        
+        return PoseTorch.stack(deltas, dim=-2)
+        
+    def path_length(self) -> torch.Tensor:
+        '''
+        Вычисляет суммарную длину траектории по последовательности поз
+        '''
+        
+        pos = self.positions()
+        diffs = pos[..., 1:, :] - pos[..., :-1, :]
+        seq_lengths = torch.linalg.norm(diffs, dim=-1)
+        
+        return seq_lengths.sum(dim=-1)
+    
+    def first_pose(self) -> PoseTorch:
+        '''
+        Возвращает первую позу траектории, как объект PoseTorch
+        '''
+    
+        return self.poses[0]
+    
+    def last_pose(self) -> PoseTorch:
+        '''
+        Возвращает последнюю позу траектории, как объект PoseTorch
+        '''
+        
+        return self.poses[-1]
+    
+    def clone(self ) -> 'TrajectoryTorch':
+        '''
+        Создает глубокую копию объекта
+        '''
+
+        return TrajectoryTorch(self.poses.clone())
+    
+    def detach(self) -> 'TrajectoryTorch':
+        '''
+        Отсоединяет траекторию от графа вычислений
+        '''
+        
+        return TrajectoryTorch(self.poses.detach())
+    
+    def to(self, *args, **kwargs) -> 'TrajectoryTorch':
+        '''
+        Переводит траекторию на другой девай dtype
+        '''
+        
+        return TrajectoryTorch(self.poses.to(*args, **kwargs))
+        
+    @classmethod
+    def stack(cls, poses: list['TrajectoryTorch'], dim: int = 0) -> 'TrajectoryTorch':
+        '''
+        Аналог torch.stack для объектов TrajectoryTorch
+        '''
+        
+        if len(poses) == 0:
+            raise ValueError('Нельзя выполнять stack для пустого списка TrajectoryTorch')
+        
+        if not all(isinstance(p, TrajectoryTorch) for p in poses):
+           raise TypeError('Все элементы списка должны быть объектами TrajectoryTorch') 
+        
+        return cls(PoseTorch.stack([traj.poses for traj in poses], dim=dim))
+    
+    @classmethod
+    def cat(cls, poses: list['TrajectoryTorch'], dim: int = 0) -> 'TrajectoryTorch':
+        '''
+        Аналог torch.stack для объектов TrajectoryTorch
+        '''
+        
+        if len(poses) == 0:
+            raise ValueError('Нельзя выполнять stack для пустого списка TrajectoryTorch')
+        
+        if not all(isinstance(p, TrajectoryTorch) for p in poses):
+           raise TypeError('Все элементы списка должны быть объектами TrajectoryTorch') 
+        
+        return cls(PoseTorch.cat([traj.poses for traj in poses], dim=dim))
+    
+    @property
+    def device(self):
+        return self.poses.device
+
+    @property
+    def dtype(self):
+        return self.poses.dtype
+    
+    @property
+    def shape(self):
+        '''
+        Возвращает батчевую форму траектории, без размерностей (N, 3)
+        '''
+
+        return self.poses.t.shape[:-2]
+    
+    def __len__(self):
+        return len(self.poses)
+    
+    def __getitem__(self, item):
+        
+        if self.poses.t.ndim >= 2:
+        
+            pose = self.poses[item]
+            
+            return TrajectoryTorch.from_absolute(pose)
+        
+        else:
+            raise ValueError('Данный объект Trajectory не итерируемый')
