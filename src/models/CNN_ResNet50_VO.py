@@ -30,4 +30,4 @@ class CNN_ResNet50_VO(nn.Module):
     def forward(self, x):
         x = self.encoder(x)
         p, r = self.fc1(x), self.fc2(x)
-        return torch.hstack([p, r])
+        return torch.hstack([p, r]).to(dtype=torch.float64)
