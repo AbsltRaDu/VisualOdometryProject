@@ -19,7 +19,7 @@ from src.geometry.PoseTorch import PoseTorch as PT
 
 class mavDataLoader(data.Dataset):
 
-    def __init__(self, path, transform=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
+    def __init__(self, path, transform=None, normalize=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
         self.transform = transform
         self.path = path
         self.device=device
@@ -27,6 +27,8 @@ class mavDataLoader(data.Dataset):
         self.dataset_group = []
         self.batchsize = batchsize
         self.hidden_size = hidden_size
+        
+        self.normalize = normalize
         
         self.lst_target = [] # Словарь временных меток и значений по каждому датасету
         self.lst_x1 = [] # Путь до фото с камеры 1
@@ -212,8 +214,8 @@ class mavDatasetCNN_3D(mavDataLoader):
     Датасет для CNN но с геометрией из PyTorch3D на самописной RotationTorch - аналоге Rotation из SciPy для работы на CUDA
     '''
     
-    def __init__(self, path, transform=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
-        super().__init__(path, transform=transform, device=device, batchsize=batchsize, hidden_size=hidden_size, lst_of_datasets=lst_of_datasets)
+    def __init__(self, path, transform=None, normalize=None, device='cpu', batchsize=8, hidden_size=0, lst_of_datasets=[]):
+        super().__init__(path, transform=transform, normalize=normalize, device=device, batchsize=batchsize, hidden_size=hidden_size, lst_of_datasets=lst_of_datasets)
         
     def get_delta_quat(self, q1: torch.Tensor, q2: torch.Tensor, p1: torch.Tensor, p2: torch.Tensor): # Ф-ия поиска определения углой эйлера из кватерионов + определение прирощения позы
         
@@ -221,5 +223,9 @@ class mavDatasetCNN_3D(mavDataLoader):
         pose2 = PT.from_rt(RT.from_quat(q2), p2)
         
         delta_pose = pose1.inv() * pose2
+        delta_pose = delta_pose.as_lie()
         
-        return delta_pose.as_lie(), pose1.as_lie()
+        if self.normalize is not None:
+            delta_pose = self.normalize.normalize(delta_pose)
+        
+        return delta_pose, pose1.as_lie()
