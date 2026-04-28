@@ -1,20 +1,18 @@
 import torch
 
-def translation_rmse_drift(p_pred, p_fact, path_lenght):
-    drift = torch.linalg.norm(p_pred - p_fact, dim=1) 
-    return torch.mean(drift / path_lenght) * 100
-
-def rotation_rmse_drift(r_pred, r_fact, path_lenght):
-    drift = torch.linalg.norm(r_pred - r_fact) 
-    return torch.mean(drift / path_lenght) * 100
-
-
-def rmse_pos(p_pred: torch.Tensor, p_fact: torch.Tensor) -> torch.Tensor:
+def translation_rmse_drift(p_lose, path_lenght):
     '''
-    RMSE по координатам
+    Метрика KITTI Odometry MRSE Pose Lose к длине пути
     '''
     
-    pred = p_pred[..., :3]
-    fact  = p_fact[..., :3]
+    return torch.mean(p_lose / path_lenght) * 100
+
+def rotation_rmse_drift(r_lose, path_lenght):
+    '''
+    Метрика KITTI Odometry RMSE Rotation Lose к длине пути
+    '''
+    
+    return torch.mean(r_lose / path_lenght) * 100
+
     
     
