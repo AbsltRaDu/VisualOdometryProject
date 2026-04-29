@@ -79,7 +79,7 @@ model = model.to(device)
 
 epochs = 10
 # TODO В представлении алгебры Ли значения векторов w, u имею примерно один диопозон. Коэф. к побуждает фокусироваться на корректировки вращений?
-loss_func = PoseLoss(k=100) 
+loss_func = PoseLoss(k=1) 
 loss_func_trajectory = PoseLossTrajectory()
 optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-6)
 count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -88,5 +88,6 @@ print('Кол-во обучаемых параметров модели:', count
 
 dct_of_results = training_CNN_JointTraning(train_data, test_data, model, loss_func_pose=loss_func, loss_func_trajectory=loss_func_trajectory, optimizer=optimizer, \
     epochs=epochs, device=device, normalize=None, \
-    name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_GL.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_GL.json'), squueze=False)
+    name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_GL.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_GL.json'), squueze=False, \
+        weigth_local=0.5, weigth_trajectory=0.5)
 

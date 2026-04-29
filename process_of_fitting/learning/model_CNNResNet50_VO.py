@@ -20,13 +20,13 @@ transform = T.Compose([
     T.Resize((320, 192))
 ])
 
-normalize = PoseNormalizerLie()
-normalize.load('process_of_fitting/normalize_params/params_of_normalize.json')
+# normalize = PoseNormalizerLie()
+# normalize.load('process_of_fitting/normalize_params/params_of_normalize.json')
 
 lst_of_datasets = ['mav0_easy1', 'mav0_vic1', 'mav0_vic2', 'mav0_easy2', 'mav0_dif1', 'mav0_dif2']
 lst_of_datasets_for_tests = ['mav0_easy1']
 
-dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=normalize, device='cpu', batchsize=16, lst_of_datasets=lst_of_datasets_for_tests) # Сразу формируем все массивы на GPU
+dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', batchsize=16, lst_of_datasets=lst_of_datasets_for_tests) # Сразу формируем все массивы на GPU
 
 groups = dataset.batch_groups.copy()
 
@@ -57,23 +57,23 @@ model = CNN_ResNet50_VO()
 model = model.to(device)
 
 # всё заморозили
-for p in model.parameters():
-    p.requires_grad = False
+# for p in model.parameters():
+#     p.requires_grad = False
 
-# обучаем новый первый слой
-for p in model.encoder.conv1.parameters():
-    p.requires_grad = True
+# # обучаем новый первый слой
+# for p in model.encoder.conv1.parameters():
+#     p.requires_grad = True
 
-# обучаем самый верхний блок resNet
-for p in model.encoder.layer4.parameters():
-    p.requires_grad = True
+# # обучаем самый верхний блок resNet
+# for p in model.encoder.layer4.parameters():
+#     p.requires_grad = True
 
-# обучаем полносвязки
-for p in model.fc1.parameters():
-    p.requires_grad = True
+# # обучаем полносвязки
+# for p in model.fc1.parameters():
+#     p.requires_grad = True
 
-for p in model.fc2.parameters():
-    p.requires_grad = True
+# for p in model.fc2.parameters():
+#     p.requires_grad = True
 
 epochs = 10
 loss_func = PoseLoss(k=1)
@@ -84,5 +84,5 @@ count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('Кол-во обучаемых параметров модели:', count_of_params, sep=' ')
 
 dct_of_results = training_CNN(train_data, test_data, model, loss_func_pose=loss_func, loss_func_trajectory=loss_func_trajectory, optimizer=optimizer, \
-    epochs=epochs, device=device, name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_tune.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_tune.json'), squueze=False)
+    epochs=epochs, device=device, normalize=None, name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_tune.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_tune.json'), squueze=False)
 
