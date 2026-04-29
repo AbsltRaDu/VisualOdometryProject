@@ -26,13 +26,13 @@ normalize.load('process_of_fitting/normalize_params/params_of_normalize.json')
 lst_of_datasets = ['mav0_easy1', 'mav0_vic1', 'mav0_vic2', 'mav0_easy2', 'mav0_dif1', 'mav0_dif2']
 lst_of_datasets_for_tests = ['mav0_easy1']
 
-dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=normalize, device='cpu', batchsize=16, lst_of_datasets=lst_of_datasets) # Сразу формируем все массивы на GPU
+dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=normalize, device='cpu', batchsize=16, lst_of_datasets=lst_of_datasets_for_tests) # Сразу формируем все массивы на GPU
 
 groups = dataset.batch_groups.copy()
 
-# # Блок урезания для теста пайплайна
-# len_groups = int(0.01 * len(groups))
-# groups = groups[:len_groups]
+# Блок урезания для теста пайплайна
+len_groups = int(0.01 * len(groups))
+groups = groups[:len_groups]
 
 train_size = int(0.8 * len(groups))
 train_groups = groups[:train_size]
@@ -76,15 +76,13 @@ for p in model.fc2.parameters():
     p.requires_grad = True
 
 epochs = 10
-loss_func = PoseLoss()
+loss_func = PoseLoss(k=1)
 loss_func_trajectory = PoseLossTrajectory()
-optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
+optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-6)
 count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 print('Кол-во обучаемых параметров модели:', count_of_params, sep=' ')
 
 dct_of_results = training_CNN(train_data, test_data, model, loss_func_pose=loss_func, loss_func_trajectory=loss_func_trajectory, optimizer=optimizer, \
-    epochs=epochs, device=device, name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_2_0.tar'), squueze=False)
+    epochs=epochs, device=device, name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_tune.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_tune.json'), squueze=False)
 
-with open(os.path.join('process_of_fitting/result_of_fitting', 'DeepVO.json'), 'w', encoding='utf-8') as w:
-   json.dump(dct_of_results, w, ensure_ascii=False, indent=4)
