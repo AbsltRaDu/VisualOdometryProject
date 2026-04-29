@@ -6,17 +6,22 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from src.metrics.KITTI_metrics import translation_rmse_drift, rotation_rmse_drift
-from src.geometry.trigan import R_mat_to_euler_and_pose, euler_to_matrix_R, get_motion_matrix
+from src.geometry.PoseTorch import PoseTorch as PT
+from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
 
-def training_CNN(train_data, test_data, model, loss_func, optimizer, epochs, device, name_of_model, squueze=False):
+from src.function_of_loss.mse_pose import PoseLossTrajectory
+
+def training_CNN(train_data, test_data, model, loss_func_pose, loss_func_trajectory, optimizer, epochs, device, name_of_model, squueze=False, normalize=None):
     best_score = 10**10
     dct_of_results = defaultdict(list)
     
     for epoch in range(epochs):
-        
-
+    
         loss_mean_train = 0
+        loss_mean_train_trajectory = 0
+        
         loss_mean_test = 0
+        loss_mean_test_trajectory = 0
         r_mean, p_mean = 0, 0
         path_lengh = 0
         lm_count = 0
@@ -25,24 +30,34 @@ def training_CNN(train_data, test_data, model, loss_func, optimizer, epochs, dev
         
         model.train()
         
-        for x_train, y_train, _ in train_bar:
+        for x_train, y_train, pose in train_bar:
             x_train = x_train.to(device) 
-            y_train = y_train.to(device) 
+            y_train = y_train.to(device)
+            pose = pose.to(device)
             
-            predict = model(x_train)
+            predict = model(x_train) # 6D Вектор алгебры Ли 
             predict = predict.unsqueeze(0) if squueze else predict
             
-            
-            loss = loss_func(predict, y_train)
+            loss = loss_func_pose(predict, y_train)
             lm_count += 1
             loss_mean_train = 1 / lm_count * loss.item() + (1 - 1 / lm_count) * loss_mean_train
+            
+            if normalize:
+                predict = normalize.denormalize(predict)
+            
+            pose_fact = PT.from_lie(pose)
+            trajectory = TT.from_lie_relative(predict, pose_fact[0])
+            
+            loss_t = loss_func_trajectory(trajectory[:-1], pose_fact)
+            loss_mean_train_trajectory = 1 / lm_count * loss_t.item() + (1 - 1 / lm_count) * loss_mean_train_trajectory
             
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             
             train_bar.set_postfix({
-                'loss': loss_mean_train
+                'loss_pose': loss_mean_train,
+                'loss_trajectory': loss_mean_train_trajectory
             })
             
         model.eval()
@@ -53,37 +68,50 @@ def training_CNN(train_data, test_data, model, loss_func, optimizer, epochs, dev
         
         for x_val, y_val, pose in val_bar:
             x_val = x_val.to(device) 
-            y_val = y_val.to(device) 
+            y_val = y_val.to(device)
+            pose = pose.to(device)
             
             with torch.no_grad():
                 predict = model(x_val)
                 predict = predict.unsqueeze(0) if squueze else predict
-                loss = loss_func(predict, y_val)
                 
-                path_lengh += torch.linalg.norm(y_val[:, :3], dim=1).sum() # Длина пути, пройденного в батче
+                loss = loss_func_pose(predict, y_val)
                 
-                p_mean_loc = translation_rmse_drift(predict[:, :3], y_val[:, :3], path_lengh)
-                r_mean_loc = rotation_rmse_drift(predict[:, 3:], y_val[:, 3:], path_lengh)
+                if normalize:
+                    predict = normalize.denormalize(predict)
+            
+                pose_fact = PT.from_lie(pose)
+                trajectory = TT.from_lie_relative(predict, pose_fact[0])
+                
+                loss_t = loss_func_trajectory(trajectory[:-1], pose_fact)
+                
+                path_lengh = trajectory.path_length()
+                
+                p_mean_loc = translation_rmse_drift(loss_func_pose.pos_loss, path_lengh)
+                r_mean_loc = rotation_rmse_drift(loss_func_pose.r_loss, path_lengh)
                 
                 lm_count += 1
                 loss_mean_test = 1 / lm_count * loss.item() + (1 - 1 / lm_count) * loss_mean_test
+                loss_mean_test_trajectory = 1 / lm_count * loss_t.item() + (1 - 1 / lm_count) * loss_mean_test_trajectory
                 p_mean = 1 / lm_count * p_mean_loc.mean().item() + (1 - 1 / lm_count) * p_mean
                 r_mean = 1 / lm_count * r_mean_loc.mean().item() + (1 - 1 / lm_count) * r_mean
 
                 val_bar.set_postfix({
-                'loss': loss_mean_test,
-                'Average Translational RMSE drift': p_mean,
-                'Average Rotational RMSE drift': r_mean,
-                'path_lenght': path_lengh
+                'loss_pose': loss_mean_test,
+                'loss_trajectory': loss_mean_test_trajectory,
+                'AT RMSE drift': p_mean,
+                'AR RMSE drift': r_mean
                 })
 
         
-        dct_of_results['loss_train'].append(loss_mean_train)
-        dct_of_results['loss_test'].append(loss_mean_test)
+        dct_of_results['loss_pose_train'].append(loss_mean_train)
+        dct_of_results['loss_pose_test'].append(loss_mean_test)
+        dct_of_results['loss_trajectory_train'].append(loss_mean_train_trajectory)
+        dct_of_results['loss_trajectory_test'].append(loss_mean_test_trajectory)
         dct_of_results['Average Translational RMSE drift'].append(p_mean)
         dct_of_results['Average Rotational RMSE drift'].append(r_mean)
         
-        
+        # TODO Действительно ли это критерий отбора?
         if p_mean + r_mean <= best_score:
             best_score = p_mean + r_mean
             torch.save(model.state_dict(), name_of_model)
