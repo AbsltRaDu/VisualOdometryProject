@@ -137,7 +137,7 @@ def training_CNN(train_data, test_data, model, loss_func_pose: PoseLoss, loss_fu
     return dct_of_results
 
 def training_CNN_JointTraning(train_data, test_data, model, loss_func_pose: PoseLoss, loss_func_trajectory: PoseLossTrajectory, optimizer, epochs, device, name_of_model, path_to_save_process_of_fitting,
-                              squueze=False, normalize=None, weigth_local=1000, weigth_trajectory=1):
+                              squueze=False, normalize=None, weigth_local=1, weigth_trajectory=0):
     best_score = 10**10
     
     # Блок подготовки словаря для записи
@@ -156,8 +156,8 @@ def training_CNN_JointTraning(train_data, test_data, model, loss_func_pose: Pose
     for epoch in range(_start, _end):
         
         if epoch % 5 == 0:
-            weigth_local -= 50
-            weigth_trajectory += 50
+            weigth_local -= 0.05
+            weigth_trajectory += 0.05
         
         
         loss_mean_train = 0
