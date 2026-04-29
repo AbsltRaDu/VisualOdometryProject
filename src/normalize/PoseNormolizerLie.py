@@ -29,7 +29,7 @@ class PoseNormalizerLie:
 
         return torch.cat([t, r], dim=-1)
     
-    def save(self, path):
+    def save(self, path, name='params_of_normalize.json'):
         
         dct = {
             'mean_t': self.mean_t.tolist(),
