@@ -23,7 +23,9 @@ def training_CNN(train_data, test_data, model, loss_func_pose: PoseLoss, loss_fu
             
         _start = dct_of_results['epoch'][-1] + 1
         _end = _start + epochs
-            
+        
+        best_score = dct_of_results['Average Translational RMSE drift'] + dct_of_results['Average Rotational RMSE drift']
+        
     else:   
         dct_of_results = defaultdict(list)
         _start = 0
@@ -155,9 +157,9 @@ def training_CNN_JointTraning(train_data, test_data, model, loss_func_pose: Pose
     
     for epoch in range(_start, _end):
         
-        if epoch % 20 == 0 and epoch != 0:
+        # if epoch % 20 == 0 and epoch != 0:
             # weigth_local -= 0.05
-            weigth_trajectory += 1e-7
+        weigth_trajectory += 0.01
         
         
         loss_mean_train = 0
