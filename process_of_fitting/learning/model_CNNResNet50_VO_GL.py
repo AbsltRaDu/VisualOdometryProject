@@ -14,7 +14,10 @@ from src.function_of_loss.mse_pose import PoseLoss, PoseLossTrajectory
 from src.piplines.pipline_learning_NN import training_CNN_JointTraning
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print('Обучение на:', device, sep=' ')
+if torch.cuda.is_available():
+    print('Обучение на:', torch.cuda.get_device_name(torch.cuda.current_device()), sep=' ')
+else:
+    print('Обучение на', device, sep=' ')
 
 transform = T.Compose([
     T.Resize((320, 192))
@@ -56,8 +59,8 @@ print('Размерность T_m:', example_of_obj[2].shape, sep=' ')
 
 model = CNN_ResNet50_VO()
 
-if os.path.isfile('process_of_fitting/fitting_models/CNNResNet50_VO_GL.tar'):
-    state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet50_VO_GL.tar')
+if os.path.isfile('process_of_fitting/fitting_models/CNNResNet50_VO.tar'):
+    state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet50_VO.tar')
     model.load_state_dict(state_dict_cnn)
     print('Были загружены веса модели с контрольной точки')
 
@@ -87,7 +90,7 @@ epochs = 30
 # TODO В представлении алгебры Ли значения векторов w, u имею примерно один диопозон. Коэф. к побуждает фокусироваться на корректировки вращений?
 loss_func = PoseLoss(k=1) 
 loss_func_trajectory = PoseLossTrajectory(reduction='mean')
-optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-6)
+optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-8)
 count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 print('Кол-во обучаемых параметров модели:', count_of_params, sep=' ')
