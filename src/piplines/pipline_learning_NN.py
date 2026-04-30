@@ -155,9 +155,9 @@ def training_CNN_JointTraning(train_data, test_data, model, loss_func_pose: Pose
     
     for epoch in range(_start, _end):
         
-        if epoch % 5 == 0:
-            weigth_local -= 0.05
-            weigth_trajectory += 0.05
+        if epoch % 20 == 0 and epoch != 0:
+            # weigth_local -= 0.05
+            weigth_trajectory += 1e-7
         
         
         loss_mean_train = 0
