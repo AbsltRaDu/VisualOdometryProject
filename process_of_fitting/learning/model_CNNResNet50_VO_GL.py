@@ -27,13 +27,13 @@ transform = T.Compose([
 lst_of_datasets = ['mav0_easy1', 'mav0_vic1', 'mav0_vic2', 'mav0_easy2', 'mav0_dif1', 'mav0_dif2']
 lst_of_datasets_for_tests = ['mav0_easy1']
 
-dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', batchsize=16, lst_of_datasets=lst_of_datasets_for_tests) # Сразу формируем все массивы на GPU
+dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', batchsize=32, lst_of_datasets=lst_of_datasets) # Сразу формируем все массивы на GPU
 
 groups = dataset.batch_groups.copy()
 
 # Блок урезания для теста пайплайна
-len_groups = int(0.01 * len(groups))
-groups = groups[:len_groups]
+# len_groups = int(0.01 * len(groups))
+# groups = groups[:len_groups]
 
 train_size = int(0.8 * len(groups))
 train_groups = groups[:train_size]
@@ -55,6 +55,12 @@ print('Размерность y:', example_of_obj[1].shape, sep=' ')
 print('Размерность T_m:', example_of_obj[2].shape, sep=' ')
 
 model = CNN_ResNet50_VO()
+
+if os.path.isfile('process_of_fitting/fitting_models/CNNResNet50_VO_GL.tar'):
+    state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet50_VO_GL.tar')
+    model.load_state_dict(state_dict_cnn)
+    print('Были загружены веса модели с контрольной точки')
+
 model = model.to(device)
 
 # TODO Для более точного описания геометрии в признаках нц дообучить все слои, но это не точно
@@ -77,10 +83,10 @@ model = model.to(device)
 # for p in model.fc2.parameters():
 #     p.requires_grad = True
 
-epochs = 10
+epochs = 30
 # TODO В представлении алгебры Ли значения векторов w, u имею примерно один диопозон. Коэф. к побуждает фокусироваться на корректировки вращений?
 loss_func = PoseLoss(k=1) 
-loss_func_trajectory = PoseLossTrajectory()
+loss_func_trajectory = PoseLossTrajectory(reduction='mean')
 optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-6)
 count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -88,6 +94,6 @@ print('Кол-во обучаемых параметров модели:', count
 
 dct_of_results = training_CNN_JointTraning(train_data, test_data, model, loss_func_pose=loss_func, loss_func_trajectory=loss_func_trajectory, optimizer=optimizer, \
     epochs=epochs, device=device, normalize=None, \
-    name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_GL.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_GL.json'), squueze=False, \
-        weigth_local=0.5, weigth_trajectory=0.5)
+    name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNNResNet50_VO_GL.tar'), path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNNResNet50_VO_GL_2_0.json'), squueze=False, \
+        weigth_local=1, weigth_trajectory=0)
 
