@@ -7,7 +7,8 @@ from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import Subset
 
-from src.dataloaders.dataloader_for_CNN import mavDatasetCNN_3D, SequenceBatchSampler
+from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
+from src.dataloaders.Samplers import BatchSampler
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
 from src.function_of_loss.mse_pose import PoseLoss, PoseLossTrajectory
@@ -27,32 +28,23 @@ transform = T.Compose([
 # normalize = PoseNormalizerLie()
 # normalize.load('process_of_fitting/normalize_params/params_of_normalize.json')
 
-lst_of_datasets = ['mav0_easy1', 'mav0_vic1', 'mav0_vic2', 'mav0_easy2', 'mav0_dif1', 'mav0_dif2']
-lst_of_datasets_for_tests = ['mav0_easy1']
+lst_of_datasets = ['mav0_vic1', 'mav0_vic2', 'mav0_easy2', 'mav0_dif1', 'mav0_dif2']
+lst_of_datasets_for_train = ['mav0_easy1']
+lst_of_datasets_for_test = ['mav0_easy1']
 
-dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', batchsize=32, lst_of_datasets=lst_of_datasets) # Сразу формируем все массивы на GPU
+dataset_train = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', lst_of_datasets=lst_of_datasets_for_train) # Сразу формируем все массивы на GPU
+dataset_test = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', lst_of_datasets=lst_of_datasets_for_test)
 
-groups = dataset.batch_groups.copy()
+train_sampler = BatchSampler(dataset_train, batch_size=32)
+test_sampler = BatchSampler(dataset_test, batch_size=32)
 
-# Блок урезания для теста пайплайна
-# len_groups = int(0.01 * len(groups))
-# groups = groups[:len_groups]
+train_data = data.DataLoader(dataset_train, batch_sampler=train_sampler, num_workers=6, pin_memory=True)
+test_data = data.DataLoader(dataset_test, batch_sampler=test_sampler, num_workers=6, pin_memory=True)
 
-train_size = int(0.8 * len(groups))
-train_groups = groups[:train_size]
-test_groups = groups[train_size:]
-
-train_sampler = SequenceBatchSampler(train_groups)
-test_sampler = SequenceBatchSampler(test_groups)
-
-train_data = data.DataLoader(dataset, batch_sampler=train_sampler, num_workers=6, pin_memory=True)
-test_data = data.DataLoader(dataset, batch_sampler=test_sampler, num_workers=6, pin_memory=True)
-
-print('Длина датасета:', len(dataset), sep=' ')
-print('Длина тренировочного выборки:', len(train_data), sep=' ')
+print('Длина тренировочного выборки:', len(train_sampler), sep=' ')
 print('Длина тестовой выборки:', len(test_data), sep=' ')
 
-example_of_obj = next(iter(dataset))
+example_of_obj = next(iter(train_data))
 print('Размерность X:', example_of_obj[0].shape, sep=' ')
 print('Размерность y:', example_of_obj[1].shape, sep=' ')
 print('Размерность T_m:', example_of_obj[2].shape, sep=' ')

@@ -7,7 +7,7 @@ from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import Subset
 
-from src.dataloaders.dataloader_for_CNN import mavDataLoader, SequenceBatchSampler
+from dataloaders.datasets_for_CNN import mavDataLoader, SequenceBatchSampler
 from src.models.DeepVO import PairwiseVOModel
 from src.function_of_loss.mse_pose import PoseLoss
 from piplines.pipline_learning_NN import training
