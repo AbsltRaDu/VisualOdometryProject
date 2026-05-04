@@ -4,7 +4,7 @@ import torch
 from torch.utils import data
 from torchvision import transforms as T
 
-from src.dataloaders.dataloader_for_CNN import mavDatasetCNN_3D
+from dataloaders.datasets_for_CNN import mavDatasetCNN_3D
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
