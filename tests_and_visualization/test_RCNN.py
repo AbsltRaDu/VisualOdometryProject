@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 import plotly.graph_objects as go
 
-from src.dataloaders.dataloader_for_CNN import mavDataLoader
+from dataloaders.datasets_for_CNN import mavDataLoader
 from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
 from src.models.DeepVO import DeepVO, PairwiseVOModel, DeepVORNN
 from src.geometry.trigan import euler_to_matrix_R, get_motion_matrix
