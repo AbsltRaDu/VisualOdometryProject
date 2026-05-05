@@ -1,5 +1,6 @@
 Датасет indoor: https://projects.asl.ethz.ch/datasets/euroc-mav/<br>
 Датасет outdoor: https://fpv.ifi.uzh.ch/
+Для генерации синтетики был написан отдельный проект на базе AirSim Microsoft: https://github.com/AbsltRaDu/AirSimDatasetCreator
 
 Веса сетей по пути:
 ```
