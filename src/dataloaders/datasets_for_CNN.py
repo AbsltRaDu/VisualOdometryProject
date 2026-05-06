@@ -19,11 +19,12 @@ from src.geometry.PoseTorch import PoseTorch as PT
     
 class mavDatasetCNN_3D(data.Dataset):
 
-    def __init__(self, path, transform=None, normalize=None, device='cpu',  lst_of_datasets=[]):
+    def __init__(self, path, transform=None, normalize=None, device='cpu',  lst_of_datasets=[], max_size=None):
         self.transform = transform
         self.path = path
         self.device=device
         self.dataset_group = []
+        self.max_size = max_size
         
         self.normalize = normalize
         
@@ -38,7 +39,14 @@ class mavDatasetCNN_3D(data.Dataset):
         
         # Блок объединения датасетов
         self._get_data(lst_of_datasets)
-            
+        
+        if self.max_size is not None:
+            self.lst_target = self.lst_target[:self.max_size]
+            self.lst_x1 = self.lst_x1[:self.max_size]
+            self.lst_x2 = self.lst_x2[:self.max_size]
+
+            self.dataset_group = [(0, len(self.lst_target))]
+        
         self.length = len(self.lst_target)
     
     @staticmethod
@@ -182,14 +190,14 @@ class SequenceDataset(data.Dataset):
     def __init__(self, dataset: data.Dataset, seq=10):
         self.dataset = dataset
         self.seq = seq
-        self.seq_groups = [(idxs[0], idxs[1] - self.seq + 1) for idxs in self.dataset.dataset_group] # Сохраняем инфу о конечном индексе для каждого датасета
+        self.dataset_group = [(idxs[0], idxs[1] - self.seq + 1) for idxs in self.dataset.dataset_group] # Сохраняем инфу о конечном индексе для каждого датасета
     
     def get_dataset_id(self, item):
-        for dataset_id, _tpl in enumerate(self.seq_groups):
+        for dataset_id, _tpl in enumerate(self.dataset_group):
             if _tpl[0] <= item <= _tpl[1]:
                 return dataset_id
 
-        raise IndexError(f'Индекс {item} вне границ seq_groups')
+        raise IndexError(f'Индекс {item} вне границ dataset_group')
     
     def __len__(self):
         return len(self.dataset) - self.seq
@@ -208,13 +216,9 @@ class SequenceDataset(data.Dataset):
             xs.append(x)
             ys.append(y)
             Ts.append(Tm)
-            
-        dataset_id = self.get_dataset_id(item)
         
         x_seq = torch.stack(xs, dim=0)
         y_seq = torch.stack(ys, dim=0)
         T_seq = torch.stack(Ts, dim=0)
-        id_dataset = torch.tensor(dataset_id, dtype=torch.long)
-        
 
-        return x_seq, y_seq, T_seq, id_dataset
+        return x_seq, y_seq, T_seq
