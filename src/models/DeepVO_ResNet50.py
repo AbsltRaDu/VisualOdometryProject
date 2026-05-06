@@ -4,9 +4,9 @@ import torchvision.models as models
 
 from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
 
-class DeepVOResNet50(nn.Module):
+class DeepVO_ResNet50(nn.Module):
     
-    def __init__(self, encoder, feat_dim=1024, hidden_size=1000, num_layers=2, pose_dim=6, dropout=0.3):
+    def __init__(self, encoder, feat_dim=2048, hidden_size=1000, num_layers=2, dropout=0.3):
         '''
         ecnoder: Модель свертки, архитектура, которой должна иметь в себе слой "encoder"
         '''
@@ -35,6 +35,9 @@ class DeepVOResNet50(nn.Module):
         
     def forward(self, x, hidden=None):
         
+        if x.ndim != 5:
+            raise ValueError(f"x должен иметь форму (S, S, C, H, W), а имеет {x.shape}")
+        
         S = x.shape[1] # берем длину последовательности
         features = []
         
@@ -46,14 +49,19 @@ class DeepVOResNet50(nn.Module):
         features = torch.stack(features, dim=1) # (B, S, F)
         rnn_out, hidden = self.rnn(features, hidden) 
         
-        p, r = self.fc1(rnn_out), self.fc2(rnn_out)
-        return torch.hstack([p, r]).to(dtype=torch.float64), hidden
+        p, r = self.fc1(rnn_out), self.fc2(rnn_out) # (B, S, 3)
+        return torch.cat([p, r], dim=-1).to(dtype=torch.float64), hidden
     
     @staticmethod
     def detach_hidden(hidden):
         '''
         Отсоединяет hidden от предыдущего вычислительного графа
+        
+        по методу truncated BPTTКак 
         '''
+        
+        if hidden is None:
+            return None
         
         if isinstance(hidden, tuple): # Для LSTM
             return tuple(h.detach() for h in hidden)
