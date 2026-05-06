@@ -77,7 +77,7 @@ class mavDatasetCNN_3D(data.Dataset):
         
         end_indx = self.start_idx_dataset + len(lst_target)
         self.dataset_group.append((self.start_idx_dataset, end_indx))
-        self.start_idx_dataset = end_indx + 1
+        self.start_idx_dataset = end_indx
         
     def _get_data(self, lst_of_datasets):
          
@@ -172,6 +172,10 @@ class SequenceDataset(data.Dataset):
     
     '''
     Обертка над mavDatasetCNN_3D для формирования последовательностей
+    
+    ВАЖНО: Не безопасно при прямом итерировании по датасету,
+    так как датасет при getitem не учитывает границы датасетов.
+    Границы учитываются в BatchSeqSampler и хранятся в параметре объекта класса seq
     '''
     
     
@@ -179,7 +183,14 @@ class SequenceDataset(data.Dataset):
         self.dataset = dataset
         self.seq = seq
         self.seq_groups = [(idxs[0], idxs[1] - self.seq + 1) for idxs in self.dataset.dataset_group] # Сохраняем инфу о конечном индексе для каждого датасета
-        
+    
+    def get_dataset_id(self, item):
+        for dataset_id, _tpl in enumerate(self.seq_groups):
+            if _tpl[0] <= item <= _tpl[1]:
+                return dataset_id
+
+        raise IndexError(f'Индекс {item} вне границ seq_groups')
+    
     def __len__(self):
         return len(self.dataset) - self.seq
 
@@ -197,9 +208,13 @@ class SequenceDataset(data.Dataset):
             xs.append(x)
             ys.append(y)
             Ts.append(Tm)
+            
+        dataset_id = self.get_dataset_id(item)
         
         x_seq = torch.stack(xs, dim=0)
         y_seq = torch.stack(ys, dim=0)
         T_seq = torch.stack(Ts, dim=0)
+        id_dataset = torch.tensor(dataset_id, dtype=torch.long)
+        
 
-        return x_seq, y_seq, T_seq
+        return x_seq, y_seq, T_seq, id_dataset

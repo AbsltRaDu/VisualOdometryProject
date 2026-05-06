@@ -41,8 +41,8 @@ test_sampler = BatchSampler(dataset_test, batch_size=32)
 train_data = data.DataLoader(dataset_train, batch_sampler=train_sampler, num_workers=6, pin_memory=True)
 test_data = data.DataLoader(dataset_test, batch_sampler=test_sampler, num_workers=6, pin_memory=True)
 
-print('Длина тренировочного выборки:', len(train_sampler), sep=' ')
-print('Длина тестовой выборки:', len(test_data), sep=' ')
+print('Длина тренировочного выборки:', len(dataset_train), sep=' ')
+print('Длина тестовой выборки:', len(dataset_test), sep=' ')
 
 example_of_obj = next(iter(train_data))
 print('Размерность X:', example_of_obj[0].shape, sep=' ')
