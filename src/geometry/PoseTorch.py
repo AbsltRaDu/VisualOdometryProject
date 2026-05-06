@@ -202,7 +202,7 @@ class PoseTorch:
         Отключение взятие производных
         '''
         
-        return PoseTorch(self.R, self.t.detach())
+        return PoseTorch(self.R.detach(), self.t.detach())
     
     def to(self, *args, **kwargs):
         '''
