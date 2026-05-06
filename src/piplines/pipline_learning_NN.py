@@ -198,12 +198,13 @@ def training_CNN_progressive(train_data, test_data, model, loss_func_pose: PoseL
         model.train()
         predict_window = None
         
-        for step, (x_train, y_train, pose) in enumerate(train_bar):
-            x_train = x_train.to(device) 
+        for step, (img1, img2, y_train, pose) in enumerate(train_bar):
+            img1 = img1.to(device) 
+            img2 = img2.to(device) 
             y_train = y_train.to(device)
             pose = pose.to(device)
             
-            predict = model(x_train) # 6D Вектор алгебры Ли 
+            predict = model(img1, img2) # 6D Вектор алгебры Ли 
             predict = predict.unsqueeze(0) if squueze else predict
             
             loss = loss_func_pose(predict, y_train)
@@ -252,13 +253,14 @@ def training_CNN_progressive(train_data, test_data, model, loss_func_pose: PoseL
         predict_window = None 
         pose_window = None
         
-        for step, (x_val, y_val, pose) in enumerate(val_bar):
-            x_val = x_val.to(device) 
+        for step, (img1, img2, y_val, pose) in enumerate(val_bar):
+            img1 = img1.to(device) 
+            img2 = img2.to(device) 
             y_val = y_val.to(device)
             pose = pose.to(device)
             
             with torch.no_grad():
-                predict = model(x_val)
+                predict = model(img1, img2)
                 predict = predict.unsqueeze(0) if squueze else predict
                 
                 loss = loss_func_pose(predict, y_val)
@@ -273,7 +275,7 @@ def training_CNN_progressive(train_data, test_data, model, loss_func_pose: PoseL
                     predict_window = torch.cat([predict_window, predict.unsqueeze(1)], dim=1)
                     pose_window = torch.cat([pose_window, pose.unsqueeze(1)], dim=1)
                 
-                if step % window_size == 0:
+                if (step + 1) % window_size == 0:
                     lm_count_trajectory += 1
                     
                     pose_fact = PT.from_lie(pose_window)

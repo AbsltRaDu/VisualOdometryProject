@@ -50,3 +50,16 @@ class PoseNormalizerLie:
 
             self.mean_r = torch.tensor(dct['mean_r'])
             self.std_r = torch.tensor(dct['std_r'])
+            
+    def to(self, *args, **kwargs):
+        '''
+        Перевод параметров нормализации на другой device / dtype
+        '''
+
+        self.mean_t = self.mean_t.to(*args, **kwargs)
+        self.std_t = self.std_t.to(*args, **kwargs)
+
+        self.mean_r = self.mean_r.to(*args, **kwargs)
+        self.std_r = self.std_r.to(*args, **kwargs)
+
+        return self

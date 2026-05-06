@@ -13,7 +13,17 @@ class CNN_ResNet18_VO(nn.Module):
             weight = None
             
         resNet = models.resnet18(weights=weight)
-        resNet.conv1 = nn.Conv2d(12, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False) # 12 каналов, потому что у нас 4 изображения с двух кадров стерео и на каждом по 3 (RGB)
+        old_conv = resNet.conv1
+        new_conv = nn.Conv2d(12, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False) # 12 каналов, потому что у нас 4 изображения с двух кадров стерео и на каждом по 3 (RGB)
+        
+        with torch.no_grad():
+            new_conv.weight[:, 0:3] = old_conv.weight / 4
+            new_conv.weight[:, 3:6] = old_conv.weight / 4
+            new_conv.weight[:, 6:9] = old_conv.weight / 4
+            new_conv.weight[:, 9:12] = old_conv.weight / 4
+            
+        resNet.conv1 = new_conv
+        
         resNet.fc = nn.Identity() # Выключаем FC, потому что пишем свой
         self.encoder = resNet # Бэкбон CNN 
         self.fc1 = nn.Sequential(
