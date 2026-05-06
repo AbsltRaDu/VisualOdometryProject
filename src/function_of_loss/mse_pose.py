@@ -84,12 +84,12 @@ class PoseLossTrajectorySeq(PoseLossTrajectory):
     def __init__(self, a: float = 100, b: float = 1, reduction: str = 'none'):
         super().__init__(a=a, b=b, reduction=reduction)
         
-    def forward(self, y_pred: TrajectoryTorch, y_fact: PoseTorch):
+    def forward(self, y_pred: TrajectoryTorch, y_fact: TrajectoryTorch):
         
         if not isinstance(y_pred, TrajectoryTorch):
             raise TypeError('y_pred должен быть объектом TrajectoryTorch')
         
-        if not isinstance(y_fact, PoseTorch):
+        if not isinstance(y_fact, TrajectoryTorch):
             raise TypeError('y_fact должен быть объектом PoseTorch')
         
         if y_pred.poses.t.ndim < 3 and y_fact.t.ndim < 3:
@@ -99,8 +99,8 @@ class PoseLossTrajectorySeq(PoseLossTrajectory):
         r_pred = y_pred.poses.R.as_quat()
         t_pred = y_pred.poses.t
         
-        r_fact = y_fact.R.as_quat()
-        t_fact = y_fact.t
+        r_fact = y_fact.poses.R.as_quat()
+        t_fact = y_fact.poses.t
         
         self.r_loss = self.mse(r_pred, r_fact).sum(dim=(1, 2)).mean()
         self.t_loss = self.mse(t_pred, t_fact).sum(dim=(1, 2)).mean()

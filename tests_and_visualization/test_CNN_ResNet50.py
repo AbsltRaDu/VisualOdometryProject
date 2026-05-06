@@ -6,7 +6,8 @@ from tqdm import tqdm
 
 import plotly.graph_objects as go
 
-from dataloaders.datasets_for_CNN import mavDataLoader, mavDatasetCNN_3D, SequenceBatchSampler
+from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
+from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
 from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
 from src.models.DeepVO import DeepVO, PairwiseVOModel, DeepVORNN
 from src.geometry.PoseTorch import PoseTorch as PT
@@ -23,33 +24,22 @@ transform = T.Compose([
 ])
 
 
-lst_of_datasets = ['mav0_easy1', 'mav0_vic1', 'mav0_vic2', 'mav0_easy2', 'mav0_dif1', 'mav0_dif2']
-lst_of_datasets_for_tests = ['mav0_easy1']
+lst_of_datasets_for_train = ['mav0']
 
-dataset = mavDatasetCNN_3D('datasets/euroc_mav', transform, normalize=None, device='cpu', batchsize=16, lst_of_datasets=lst_of_datasets_for_tests) # Сразу формируем все массивы на GPU
+dataset = mavDatasetCNN_3D('datasets/simulation', transform, normalize=None, device='cpu', lst_of_datasets=lst_of_datasets_for_train, max_size=100) # Сразу формируем все массивы на GPU
+dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
-groups = dataset.batch_groups.copy()
-
-# Блок урезания для теста пайплайна
-# len_groups = int(0.01 * len(groups))
-# groups = groups[:len_groups]
-
-train_size = int(0.8 * len(groups))
-train_groups = groups[:train_size]
-train_sampler = SequenceBatchSampler(train_groups)
-train_data = data.DataLoader(dataset, batch_sampler=train_sampler, num_workers=6, pin_memory=True)
-
-print('Длина датасета:', len(train_groups), sep=' ')
+print('Длина датасета:', len(dataset), sep=' ')
 
 model_cnn = CNN_ResNet50_VO()
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet50_VO.tar')
+state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet50_VO_SW_TEST.tar', map_location=device)
 model_cnn.load_state_dict(state_dict_cnn)
 model_cnn = model_cnn.to(device)
 
 trajectory = []
 trajectory_pred = []
 
-dtrain = iter(train_data)
+dtrain = iter(dtrain)
 model_cnn.eval()
 with torch.no_grad():
     
@@ -59,19 +49,19 @@ with torch.no_grad():
     y = y.to(device)
     
     pose0 = PT.from_lie(pose)
-    trajectory = TT.from_lie_relative(y_pred, pose0[0])
-    trajectory_fact = TT.from_absolute(pose0)
+    trajectory = TT.from_lie_relative(y_pred, pose0)
+    trajectory_fact = TT.from_lie_relative(y, pose0)
     
     dataset_train = tqdm(dtrain, desc=f'Поехали', position=0)
     for item in dataset_train:
         x, y, _ = item
         
         y_pred = model_cnn(x.to(device))
-        trajectory.extend_lie_relative(y_pred)
-        trajectory_fact.extend_lie_relative(y)
+        trajectory = trajectory.extend_lie_relative(y_pred)
+        trajectory_fact = trajectory_fact.extend_lie_relative(y)
         
-trajectory_fact = trajectory_fact.positions().cpu()
-trajectory = trajectory[:-1].positions().cpu()
+trajectory_fact = trajectory_fact.positions().squeeze(0).cpu()
+trajectory = trajectory.positions().squeeze(0).cpu()
 
 fig = go.Figure()
 
