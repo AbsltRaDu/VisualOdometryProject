@@ -83,7 +83,7 @@ if os.path.isfile('process_of_fitting/fitting_models/CNNResNet50_VO_SW.tar'):
 epochs = 10
 loss_func = PoseLoss(k=1)
 loss_func_trajectory = PoseLossTrajectory(reduction='mean')
-optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-8)
+optimizer = torch.optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()), lr=1e-4)
 count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 print('Кол-во обучаемых параметров модели:', count_of_params, sep=' ')
