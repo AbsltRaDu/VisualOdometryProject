@@ -49,8 +49,8 @@ dataset_test = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=no
 
 WINDOW_SIZE = 10
 
-train_sampler = ProgressiveWindowBatchSampler(dataset_train, batch_size=32, window_size=WINDOW_SIZE, shuffle=True)
-test_sampler = ProgressiveWindowBatchSampler(dataset_test, batch_size=32, window_size=WINDOW_SIZE, shuffle=True)
+train_sampler = ProgressiveWindowBatchSampler(dataset_train, batch_size=64, window_size=WINDOW_SIZE, shuffle=True)
+test_sampler = ProgressiveWindowBatchSampler(dataset_test, batch_size=64, window_size=WINDOW_SIZE, shuffle=True)
 
 train_data = data.DataLoader(dataset_train, batch_sampler=train_sampler, num_workers=6, pin_memory=True)
 test_data = data.DataLoader(dataset_test, batch_sampler=test_sampler, num_workers=6, pin_memory=True)

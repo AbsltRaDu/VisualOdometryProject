@@ -187,29 +187,37 @@ class SequenceDataset(data.Dataset):
     '''
     
     
-    def __init__(self, dataset: data.Dataset, seq=10):
+    def __init__(self, dataset: data.Dataset, seq=10, stride=None):
         self.dataset = dataset
         self.seq = seq
+        self.stride = stride if stride is not None else seq
         self.dataset_group = [(idxs[0], idxs[1] - self.seq + 1) for idxs in self.dataset.dataset_group] # Сохраняем инфу о конечном индексе для каждого датасета
     
-    def get_dataset_id(self, item):
-        for dataset_id, _tpl in enumerate(self.dataset_group):
-            if _tpl[0] <= item <= _tpl[1]:
-                return dataset_id
+        self.seq_starts = []
 
-        raise IndexError(f'Индекс {item} вне границ dataset_group')
+        for start, end in self.dataset.dataset_group:
+
+            max_start = end - self.seq
+
+            for idx in range(start, max_start + 1, self.stride):
+                self.seq_starts.append(idx)
+
+        self.dataset_group = [(0, len(self.seq_starts))]
+
     
     def __len__(self):
-        return len(self.dataset) - self.seq
+        return len(self.seq_starts)
 
         
     def __getitem__(self, item):
+        start_idx = self.seq_starts[item]
+        
         
         xs = []
         ys = []
         Ts = []
         
-        for idx in range(item, item + self.seq):
+        for idx in range(start_idx, start_idx + self.seq):
             
             x, y, Tm = self.dataset[idx]
         

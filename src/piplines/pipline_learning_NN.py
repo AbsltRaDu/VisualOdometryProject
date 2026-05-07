@@ -198,13 +198,12 @@ def training_CNN_progressive(train_data, test_data, model, loss_func_pose: PoseL
         model.train()
         predict_window = None
         
-        for step, (img1, img2, y_train, pose) in enumerate(train_bar):
-            img1 = img1.to(device) 
-            img2 = img2.to(device) 
+        for step, (x, y_train, pose) in enumerate(train_bar):
+            x = x.to(device) 
             y_train = y_train.to(device)
             pose = pose.to(device)
             
-            predict = model(img1, img2) # 6D Вектор алгебры Ли 
+            predict = model(x) # 6D Вектор алгебры Ли 
             predict = predict.unsqueeze(0) if squueze else predict
             
             loss = loss_func_pose(predict, y_train)
@@ -253,14 +252,13 @@ def training_CNN_progressive(train_data, test_data, model, loss_func_pose: PoseL
         predict_window = None 
         pose_window = None
         
-        for step, (img1, img2, y_val, pose) in enumerate(val_bar):
-            img1 = img1.to(device) 
-            img2 = img2.to(device) 
+        for step, (x, y_val, pose) in enumerate(val_bar):
+            x = x.to(device) 
             y_val = y_val.to(device)
             pose = pose.to(device)
             
             with torch.no_grad():
-                predict = model(img1, img2)
+                predict = model(x)
                 predict = predict.unsqueeze(0) if squueze else predict
                 
                 loss = loss_func_pose(predict, y_val)
@@ -348,8 +346,8 @@ def training_RCNN_progressive_JointTrain(train_data, test_data, model, loss_func
     
     for epoch in range(_start, _end):
         
-        if epoch < 10:
-            weight_trajectory = weight_trajectory * (epoch + 1)
+        if epoch > 20 and epoch % 5 == 0:
+            weight_trajectory += 0.05
         
         loss_mean_train = 0
         loss_pose_mean_train = 0
