@@ -8,6 +8,7 @@ class DeepVO(nn.Module):
         '''
         RNN + FCx2 блока для возможности трансферного обучения
         '''
+        super().__init__()
         
         self.rnn = nn.LSTM(
             input_size=feat_dim,
@@ -63,9 +64,9 @@ class DeepVO_CNN(nn.Module):
             features.append(feat_s)
 
         features = torch.stack(features, dim=1) # (B, S, F)        
-        p, r = self.head(features, hidden)
+        y, hidden = self.head(features, hidden)
         
-        return torch.cat([p, r], dim=-1).to(dtype=torch.float64), hidden
+        return y.to(dtype=torch.float64), hidden
     
     @staticmethod
     def detach_hidden(hidden):
@@ -80,7 +81,31 @@ class DeepVO_CNN(nn.Module):
         
         if isinstance(hidden, tuple): # Для LSTM
             return tuple(h.detach() for h in hidden)
+
+class DeepVO_RAFT(DeepVO_CNN):
+    
+    def __init__(self, encoder, feat_dim=128, hidden_size=256, num_layers=2, dropout=0.3):
+        super().__init__(encoder, feat_dim, hidden_size, num_layers, dropout)
         
+    def forward(self, img1, img2, hidden=None):
+        
+        if img1.ndim != 5:
+            raise ValueError(f"img1 должен иметь форму (S, S, C, H, W), а имеет {img1.shape}")
+        
+        S = img1.shape[1] # берем длину последовательности
+        features = []
+        
+        for s in range(S):
+            img1_s = img1[:, s] # (B, C, H, W)
+            img2_s = img2[:, s]
+            feat_s = self.encoder(img1_s, img2_s)
+            features.append(feat_s.flatten(1))
+
+        features = torch.stack(features, dim=1) # (B, S, F)        
+        y, hidden = self.head(features, hidden)
+        
+        return y.to(dtype=torch.float64), hidden
+       
 class PairwiseVOModel(nn.Module): # Модель для обучения экодера. Учим его распознавать паттерны
     def __init__(self, encoder, feet_dim=1024, pose_dim=6, dropout=0.3):
         '''

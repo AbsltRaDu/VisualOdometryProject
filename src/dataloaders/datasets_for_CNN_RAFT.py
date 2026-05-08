@@ -16,7 +16,7 @@ from scipy.spatial.transform import Rotation as R
 
 from src.geometry.RotationTorch import RotationTorch as RT
 from src.geometry.PoseTorch import PoseTorch as PT
-from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
+from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D, SequenceDataset
     
 class mavDatasetCNN_RAFT(mavDatasetCNN_3D):
 
@@ -58,7 +58,7 @@ class mavDatasetCNN_RAFT(mavDatasetCNN_3D):
         return img1, img2, y, T_m
     
     
-class SequenceDataset(data.Dataset):
+class SequenceDataset_RAFT(SequenceDataset):
     
     '''
     Обертка над mavDatasetCNN_3D для формирования последовательностей
@@ -69,38 +69,28 @@ class SequenceDataset(data.Dataset):
     '''
     
     
-    def __init__(self, dataset: data.Dataset, seq=10):
-        self.dataset = dataset
-        self.seq = seq
-        self.dataset_group = [(idxs[0], idxs[1] - self.seq + 1) for idxs in self.dataset.dataset_group] # Сохраняем инфу о конечном индексе для каждого датасета
+    def __init__(self, dataset: data.Dataset, seq=10, stride=None):
+        super().__init__(dataset, seq, stride)
     
-    def get_dataset_id(self, item):
-        for dataset_id, _tpl in enumerate(self.dataset_group):
-            if _tpl[0] <= item <= _tpl[1]:
-                return dataset_id
-
-        raise IndexError(f'Индекс {item} вне границ dataset_group')
-    
-    def __len__(self):
-        return len(self.dataset) - self.seq
-
-        
     def __getitem__(self, item):
         
-        xs = []
+        img1s = []
+        img2s = []
         ys = []
         Ts = []
         
         for idx in range(item, item + self.seq):
             
-            x, y, Tm = self.dataset[idx]
+            img1, img2, y, Tm = self.dataset[idx]
         
-            xs.append(x)
+            img1s.append(img1)
+            img2s.append(img2)
             ys.append(y)
             Ts.append(Tm)
         
-        x_seq = torch.stack(xs, dim=0)
+        img1_seq = torch.stack(img1s, dim=0)
+        img2_seq = torch.stack(img2s, dim=0)
         y_seq = torch.stack(ys, dim=0)
         T_seq = torch.stack(Ts, dim=0)
 
-        return x_seq, y_seq, T_seq
+        return img1_seq, img2_seq, y_seq, T_seq

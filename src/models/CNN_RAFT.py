@@ -43,3 +43,20 @@ class RAFTPoseCNN(nn.Module):
         x = x.flatten(1)
         p, r = self.fc1(x), self.fc2(x)
         return torch.hstack([p, r]).to(dtype=torch.float64)
+    
+class RAFTPoseCNNEncoder(nn.Module):
+    
+    def __init__(self, raft, cnn):
+        super().__init__()
+        
+        self.flow_model = raft
+        self.CNN = cnn
+        
+    def forward(self, img1, img2):
+        
+        flows = self.flow_model(img1, img2)
+        flow = flows[-1]  # (B, 2, H, W)
+
+        x = self.CNN(flow)
+        
+        return x
