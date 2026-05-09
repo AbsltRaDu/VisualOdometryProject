@@ -31,14 +31,14 @@ ptyprocess==0.7.0
 pure_eval==0.2.3
 Pygments==2.19.2
 python-dateutil==2.9.0.post0
-pytorch3d @ git+https://github.com/facebookresearch/pytorch3d.git@b6a77ad7aaf41ed90fca80ce6a2bac3c462a7881
+#  --no-build-isolation git+https://github.com/facebookresearch/pytorch3d.git@b6a77ad7aaf41ed90fca80ce6a2bac3c462a7881
 pyzmq==27.1.0
 scipy==1.17.1
 six==1.17.0
 stack-data==0.6.3
 sympy==1.14.0
-torch==2.10.0+cpu
-torchvision==0.25.0+cpu
+torch==2.10.0
+torchvision==0.25.0
 tornado==6.5.4
 tqdm==4.67.3
 traitlets==5.14.3

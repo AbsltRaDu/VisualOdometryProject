@@ -780,17 +780,19 @@ def training_RCNN_progressive_JointTrain_RAFT(train_data, test_data, model, loss
             loss_mean_trajectory_metric = 1 / lm_count_trajectory * loss_t_metric_global.item() + (1 - 1 / lm_count_trajectory) * loss_mean_trajectory_metric
             
             loss = weight_pose * loss_pose + weight_trajectory * loss_t
-            loss_mean_train = 1 / lm_count * loss.item() + (1 - 1 / lm_count) * loss_mean_train
+            
             
             (loss / window_size).backward() # Делим на длину окна, что масштабировать градиенты
             
             if (step + 1) % window_size == 0:
                 hidden = None
                 pred_pose0 = None
-                
-                optimizer.step()
-                optimizer.zero_grad()
-
+                loss += weight_trajectory * loss_t
+            
+            loss_mean_train = 1 / lm_count * loss.item() + (1 - 1 / lm_count) * loss_mean_train
+            
+            optimizer.step()
+            optimizer.zero_grad()
             
             train_bar.set_postfix({
                 'loss': loss_mean_train,
