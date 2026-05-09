@@ -63,7 +63,8 @@ class DeepVO_CNN(nn.Module):
             feat_s = self.encoder(x_s)
             features.append(feat_s)
 
-        features = torch.stack(features, dim=1) # (B, S, F)        
+        features = torch.stack(features, dim=1) # (B, S, F)     
+          
         y, hidden = self.head(features, hidden)
         
         return y.to(dtype=torch.float64), hidden

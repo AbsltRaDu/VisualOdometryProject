@@ -740,7 +740,7 @@ def training_RCNN_progressive_JointTrain_RAFT(train_data, test_data, model, loss
             img2 = img2.to(device) 
             y_train = y_train.to(device)
             pose = pose.to(device)
-            
+
             if hidden is not None:
                 hidden = model.detach_hidden(hidden) # отрубили от графа вычислений предыдущий скрытый слой
             
@@ -776,7 +776,7 @@ def training_RCNN_progressive_JointTrain_RAFT(train_data, test_data, model, loss
 
             # Чтоб не дай бог градиент не посчитался по всей последовательности
             with torch.no_grad():
-                loss_t_metric_global = loss_func_trajectory(trajectory_pred_metric, trajectory_fact_metric)
+                loss_t_metric_global = loss_func_trajectory(trajectory_pred_metric[:-1], trajectory_fact_metric[:-1])
             loss_mean_trajectory_metric = 1 / lm_count_trajectory * loss_t_metric_global.item() + (1 - 1 / lm_count_trajectory) * loss_mean_trajectory_metric
             
             loss = weight_pose * loss_pose + weight_trajectory * loss_t
@@ -801,7 +801,7 @@ def training_RCNN_progressive_JointTrain_RAFT(train_data, test_data, model, loss
         
         optimizer.step()
         optimizer.zero_grad() 
-            
+
         model.eval()
         
         val_bar = tqdm(test_data, desc=f'Эпоха валидационная {epoch+1}/{_end}', position=1)
@@ -833,19 +833,21 @@ def training_RCNN_progressive_JointTrain_RAFT(train_data, test_data, model, loss
                 fact_pose = PT.from_lie(pose)
                 if pred_pose0 is None:
                     pred_pose0 = fact_pose[0]
-                    trajectory_fact_metric = TT.from_lie_relative(y_train, pred_pose0)
+                    trajectory_fact_metric = TT.from_lie_relative(y_val, pred_pose0)
                     trajectory_pred_metric = TT.from_lie_relative(predict, pred_pose0)
                     
                 else:
-                    trajectory_fact_metric = trajectory_fact_metric.extend_lie_relative(y_train)
+                    trajectory_fact_metric = trajectory_fact_metric.extend_lie_relative(y_val)
                     trajectory_pred_metric = trajectory_pred_metric.extend_lie_relative(predict)
             
             
             
-            lm_count_trajectory += 1
+            
             if (step + 1) % window_size == 0:
                 hidden = None
-                path_lengh = trajectory.path_length()
+                pred_pose0 = None
+                lm_count_trajectory += 1
+                path_lengh = trajectory_fact_metric.path_length()
 
                 loss_t_metric_global = loss_func_trajectory(trajectory_pred_metric, trajectory_fact_metric)
                 p_mean_loc = translation_rmse_drift(loss_func_pose.pos_loss, path_lengh)

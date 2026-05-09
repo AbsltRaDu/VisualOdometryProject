@@ -22,7 +22,7 @@ else:
 
 transform = T.Compose([
     T.Resize((192, 320)),
-    T.Normalize(mean=[-1], std=[1])
+    T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
 # normalize = PoseNormalizerLie()
@@ -57,8 +57,8 @@ print('Размерность T_m:', example_of_obj[3].shape, sep=' ')
 model = RAFTPoseCNN()
 model = model.to(device)
 
-if os.path.isfile('process_of_fitting/fitting_models/CNN_RAFT.tar'):
-    state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNN_RAFT.tar', map_location=device)
+if os.path.isfile('process_of_fitting/fitting_models/CNN_RAFT_2.tar'):
+    state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNN_RAFT_2.tar', map_location=device)
     model.load_state_dict(state_dict_cnn)
     print('Были загружены веса модели с контрольной точки')
 
@@ -89,6 +89,6 @@ count_of_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print('Кол-во обучаемых параметров модели:', count_of_params, sep=' ')
 
 dct_of_results = training_RAFT_progressive(train_data, test_data, model, loss_func_pose=loss_func, loss_func_trajectory=loss_func_trajectory, optimizer=optimizer, \
-    epochs=epochs, device=device, normalize=None, name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNN_RAFT.tar'), \
-        path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNN_RAFT.json'), squueze=False, window_size=WINDOW_SIZE)
+    epochs=epochs, device=device, normalize=None, name_of_model=os.path.join('process_of_fitting/fitting_models', 'CNN_RAFT_2.tar'), \
+        path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'CNN_RAFT_2.json'), squueze=False, window_size=WINDOW_SIZE)
 
