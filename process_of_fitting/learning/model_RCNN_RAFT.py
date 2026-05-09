@@ -108,5 +108,5 @@ print('Кол-во обучаемых параметров модели:', count
 
 dct_of_results = training_RCNN_progressive_JointTrain_RAFT(train_data, train_data, model, loss_func_pose=loss_func, loss_func_trajectory=loss_func_trajectory, optimizer=optimizer, \
     epochs=epochs, device=device, normalize=None, name_of_model=os.path.join('process_of_fitting/fitting_models', 'RCNN_RAFT.tar'), \
-        path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'RCNN_RAFT.json'), squueze=False, window_size=WINDOW_SIZE, weight_trajectory=0)
+        path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'RCNN_RAFT.json'), squueze=False, window_size=WINDOW_SIZE, weight_trajectory=0.5)
 
