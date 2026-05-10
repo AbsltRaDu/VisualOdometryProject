@@ -18,47 +18,55 @@ from src.geometry.RotationTorch import RotationTorch as RT
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D, SequenceDataset
     
-class mavDatasetCNN_RAFT(mavDatasetCNN_3D):
+class mavDataset(mavDatasetCNN_3D):
 
     def __init__(self, path, transform=None, normalize=None, device='cpu',  lst_of_datasets=[], max_size=None):
         super().__init__(path=path, transform=transform, normalize=normalize, device=device, lst_of_datasets=lst_of_datasets, max_size=max_size)
         
     
-    def get_mat_of_imgs(self, pair1):
+    def get_mat_of_imgs(self, pair1, pair2):
 
         path_to_img1, path_to_img2 = pair1
-        
-        # img1, img2 = Image.open(path_to_img1).convert('RGB'), Image.open(path_to_img2).convert('RGB')
-        # img3, img4 = Image.open(path_to_img3).convert('RGB'), Image.open(path_to_img4).convert('RGB')
+        path_to_img3, path_to_img4 = pair2
         
         img1, img2 = read_image(path_to_img1), read_image(path_to_img2)
+        img3, img4 = read_image(path_to_img3), read_image(path_to_img4)
         
         if img1.shape[0] == 1:
             img1 = img1.repeat(3, 1, 1)
         if img2.shape[0] == 1:
             img2 = img2.repeat(3, 1, 1)
+        if img3.shape[0] == 1:
+            img3 = img3.repeat(3, 1, 1)
+        if img4.shape[0] == 1:
+            img4 = img4.repeat(3, 1, 1)
         
         img1 = img1.float() / 255.0
         img2 = img2.float() / 255.0
+        img3 = img3.float() / 255.0
+        img4 = img4.float() / 255.0
         
+        
+        x = None
         if self.transform:
             img1, img2 = self.transform(img1), self.transform(img2)
-            
+            img3, img4 = self.transform(img3), self.transform(img4)
         
-        return img1, img2
+        return img1, img3, img2, img4
     
     def __getitem__(self, item):
 
         pair1 = self.lst_x1[item]
-        img1, img2 = self.get_mat_of_imgs(pair1)
+        pair2 = self.lst_x2[item]
+        img1, img3, img2, img4 = self.get_mat_of_imgs(pair1, pair2)
 
         # Получаем координаты
         y, T_m = self.lst_target[item]
     
-        return img1, img2, y, T_m
+        return img1, img3, img2, img4, y, T_m
     
     
-class SequenceDataset_RAFT(SequenceDataset):
+class SequenceDataset_classic(SequenceDataset):
     
     '''
     Обертка над mavDatasetCNN_3D для формирования последовательностей
@@ -75,22 +83,28 @@ class SequenceDataset_RAFT(SequenceDataset):
     def __getitem__(self, item):
         
         img1s = []
+        img3s = []
         img2s = []
+        img4s = []
         ys = []
         Ts = []
         
         for idx in range(item, item + self.seq):
             
-            img1, img2, y, Tm = self.dataset[idx]
+            img1, img3, img2, img4, y, Tm = self.dataset[idx]
         
             img1s.append(img1)
-            img2s.append(img2)
+            img3s.append(img3)
+            img1s.append(img1)
+            img4s.append(img4)
             ys.append(y)
             Ts.append(Tm)
         
         img1_seq = torch.stack(img1s, dim=0)
+        img3_seq = torch.stack(img3s, dim=0)
         img2_seq = torch.stack(img2s, dim=0)
+        img4_seq = torch.stack(img4s, dim=0)
         y_seq = torch.stack(ys, dim=0)
         T_seq = torch.stack(Ts, dim=0)
 
-        return img1_seq, img2_seq, y_seq, T_seq
+        return img1_seq, img3_seq, img2_seq, img4_seq, y_seq, T_seq

@@ -7,9 +7,9 @@ from tqdm import tqdm
 
 import plotly.graph_objects as go
 
-from src.dataloaders.datasets_for_CNN_RAFT import mavDatasetCNN_RAFT, SequenceDataset_RAFT
+from dataloaders.datasets import mavDatasetCNN_RAFT, SequenceDataset_RAFT
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
-from src.models.CNN_RAFT import RAFTPoseCNN, RAFTPoseCNNEncoder
+from src.models.CNN_LiteFlowNet import LiteFlowNetPoseCNN
 from src.models.DeepVO import DeepVO_RAFT
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 from src.geometry.PoseTorch import PoseTorch as PT
@@ -34,18 +34,17 @@ lst_of_dataset = os.listdir('datasets/simulation')
 lst_of_dataset_train = lst_of_dataset[-2]
 lst_of_dataset_test = lst_of_dataset[-1]
 
-dataset = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test, max_size=30) # Сразу формируем все массивы на GPU
+dataset = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
 dataset = SequenceDataset_RAFT(dataset, seq=1)
 dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
 print('Длина датасета:', len(dataset), sep=' ')
 
-raft = RAFTPoseCNN()
-encoder = RAFTPoseCNNEncoder(raft=raft.flow_model, cnn=raft.CNN)
-model_cnn = DeepVO_RAFT(encoder=encoder)
+encoder = LiteFlowNetPoseCNN()
+model_cnn = DeepVO_RAFT(encoder=encoder.encoder)
 
 
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/RCNN_RAFT_test.tar', map_location=device)
+state_dict_cnn = torch.load('process_of_fitting/fitting_models/RCNN_LiteFlowNet.tar', map_location=device)
 model_cnn.load_state_dict(state_dict_cnn)
 model_cnn = model_cnn.to(device)
 

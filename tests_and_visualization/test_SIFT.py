@@ -1,49 +1,45 @@
+import os
+
+import numpy as np
 import torch
 from torch.utils import data
 from torchvision import transforms as T
-import os
-
+import cv2
 from tqdm import tqdm
 
 import plotly.graph_objects as go
 
-from dataloaders.datasets import mavDatasetCNN_RAFT
-from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
-from src.models.CNN_RAFT import RAFTPoseCNN
-from src.models.DeepVO import DeepVO, PairwiseVOModel
+from src.dataloaders.datasets import mavDataset
+from src.classic_models.FeaturesMethodModel import FeaturesMethod
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-if torch.cuda.is_available():
-    print('Инференс на:', torch.cuda.get_device_name(torch.cuda.current_device()), sep=' ')
-else:
-    print('Инференс на', device, sep=' ')
+from src.classic_models.blocks.transforms_for_classic import TorchImageToCvGray
 
 transform = T.Compose([
-    T.Resize((192, 320)),
-    T.Normalize(mean=[-1], std=[1])
+    # T.Resize((192, 320)),
+    TorchImageToCvGray()
 ])
 
-# # normalize = PoseNormalizerLie()
-# # normalize.load('process_of_fitting/normalize_params/params_of_normalize.json')
 normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
 lst_of_dataset_train = lst_of_dataset[-2]
 lst_of_dataset_test = lst_of_dataset[-1]
 
-dataset = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
+dataset = mavDataset('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
 dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
 print('Длина датасета:', len(dataset), sep=' ')
 
-model_cnn = RAFTPoseCNN()
 
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNN_RAFT.tar', map_location=device)
-model_cnn.load_state_dict(state_dict_cnn)
-model_cnn = model_cnn.to(device)
+# detect = cv2.SIFT_create(nfeatures=3000)
+# matcher = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=False)
+
+detect = cv2.ORB_create(nfeatures=3000)
+matcher = cv2.BFMatcher(normType=cv2.NORM_HAMMING, crossCheck=False)
+
+model = FeaturesMethod(752, 480, 752, 480, 90, 0.12, detection_algoritm=detect, matcher=matcher, return_debug=True)
 
 trajectory = []
 trajectory_pred = []
@@ -51,13 +47,25 @@ trajectory_pred = []
 # normalize = normalize.to(device)
 
 dtrain = iter(dtrain)
-model_cnn.eval()
+model.eval()
 with torch.no_grad():
     
-    img1, img2, y, pose = next(dtrain)
-    pose = pose.to(device)
-    y_pred = model_cnn(img1.to(device), img2.to(device))
-    y = y.to(device)
+    img1, img3, img2, img4, y, pose = next(dtrain)
+    
+    print(img1.shape)
+    
+    img1 = img1[0].numpy().astype(np.uint8)
+    img2 = img2[0].numpy().astype(np.uint8)
+    img3 = img3[0].numpy().astype(np.uint8)
+
+    pose = pose
+    y_pred, debug = model(img1, img3, img2)
+    y_pred = y_pred.unsqueeze(0)
+    y = y
+
+    
+    if not debug.get('success'):
+        print(debug)
     
     if normalize:
         y_pred = normalize.denormalize(y_pred)
@@ -68,18 +76,27 @@ with torch.no_grad():
     
     dataset_train = tqdm(dtrain, desc=f'Поехали', position=0)
     for item in dataset_train:
-        img1, img2, y, _ = item
+        img1, img3, img2, img4, y, _ = item
         
-        y_pred = model_cnn(img1.to(device), img2.to(device))
+        img1 = img1[0].numpy().astype(np.uint8)
+        img2 = img2[0].numpy().astype(np.uint8)
+        img3 = img3[0].numpy().astype(np.uint8)
+        
+        y_pred, debug = model(img1, img3, img2)
+        y_pred = y_pred.unsqueeze(0)
+
+        
+        if not debug.get('success'):
+            print(debug)
         
         if normalize:
             y_pred = normalize.denormalize(y_pred)
         
         trajectory = trajectory.extend_lie_relative(y_pred)
         trajectory_fact = trajectory_fact.extend_lie_relative(y)
-        
-trajectory_fact = trajectory_fact.positions().squeeze(0).cpu()
-trajectory = trajectory.positions().squeeze(0).cpu()
+
+trajectory_fact = trajectory_fact.positions().squeeze().cpu()
+trajectory = trajectory.positions().squeeze().cpu()
 
 fig = go.Figure()
 
