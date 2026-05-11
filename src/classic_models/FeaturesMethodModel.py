@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 import cv2
 
-from src.classic_models.blocks.Matchers import Matcher, TemporalMatcher
+from src.classic_models.blocks.Matchers import Matcher, TemporalMatcher, StereoFilter, FundamentalMat
 from src.geometry.Triangulation import Triangulation
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.RotationTorch import RotationTorch as RT
@@ -34,6 +34,8 @@ class FeaturesMethod(nn.Module):
         
         self.detection_algoritm = detection_algoritm
         self.matcher = Matcher(matcher=matcher, k=k_match)
+        self.stereo_filter = StereoFilter()
+        self.fm = FundamentalMat()
         self.temporal_matcher = TemporalMatcher(matcher=matcher, k=k_match)
         self.triangulation = Triangulation(self.width, self.height, self.new_width, self.new_height, self.fov_deg, self.baseline)
         
@@ -87,28 +89,29 @@ class FeaturesMethod(nn.Module):
             }
             
             # Блок детекции и дескрипизации
-            kp1, des1 = self.detection_algoritm.detectAndCompute(img_left_1, None)
-            kp3, des3 = self.detection_algoritm.detectAndCompute(img_left_2, None)
-            kp2, des2 = self.detection_algoritm.detectAndCompute(img_right_1, None)
+            kp1_left_1, des1_left_1 = self.detection_algoritm.detectAndCompute(img_left_1, None)
+            kp3_left_2, des3_left_2 = self.detection_algoritm.detectAndCompute(img_left_2, None)
+            kp2_right_1, des2_right_1 = self.detection_algoritm.detectAndCompute(img_right_1, None)
             
-            debug['num_kp_left_1'] = 0 if kp1 is None else len(kp1)
-            debug['num_kp_right_1'] = 0 if kp2 is None else len(kp2)
-            debug['num_kp_left_2'] = 0 if kp3 is None else len(kp3)
+            debug['num_kp_left_1'] = 0 if kp1_left_1 is None else len(kp1_left_1)
+            debug['num_kp_right_1'] = 0 if kp2_right_1 is None else len(kp2_right_1)
+            debug['num_kp_left_2'] = 0 if kp3_left_2 is None else len(kp3_left_2)
             
-            if des1 is None or des2 is None or des3 is None:
+            if des1_left_1 is None or des2_right_1 is None or des3_left_2 is None:
                 return self._zero_prediction(
                     reason='Нет дескриптора',
                     debug=debug,
                 )
                 
-            if len(kp1) == 0 or len(kp2) == 0 or len(kp3) == 0:
+            if len(kp1_left_1) == 0 or len(kp2_right_1) == 0 or len(kp3_left_2) == 0:
                 return self._zero_prediction(
                     reason='Нет ключевых точек',
                     debug=debug,
                 )
             
             # Блок мэтчинга
-            good_matches = self.matcher(des1, des2)
+            good_matches = self.matcher(des1_left_1, des2_right_1)
+            # good_matches = self.stereo_filter(good_matches, kp1_left_1, kp2_right_1)
             
             debug['num_stereo_matches'] = len(good_matches)
             if len(good_matches) < self.min_stereo_matches:
@@ -118,14 +121,27 @@ class FeaturesMethod(nn.Module):
                 )
             
             pts_left = np.float32([
-                kp1[m.queryIdx].pt
+                kp1_left_1[m.queryIdx].pt
                 for m in good_matches
             ])
             left_indeces = np.asarray([m.queryIdx for m in good_matches], dtype=np.int32)
             pts_right = np.float32([
-                kp2[m.trainIdx].pt
+                kp2_right_1[m.trainIdx].pt
                 for m in good_matches
             ])
+            
+            # good_matches, pts_left, pts_right, fm_mask, debug = self.fm(good_matches, pts_left, pts_right)
+            
+            # if fm_mask is not None:
+            #     left_indeces = left_indeces[fm_mask]
+            
+            # debug["num_stereo_matches_after_fm"] = len(good_matches)
+
+            # if len(good_matches) < self.min_stereo_matches:
+            #     return self._zero_prediction(
+            #         reason="Недостаточно stereo matches после FundamentalMat",
+            #         debug=debug,
+            #     )
             
             # Блок триангуляции
             points_3d, valid = self.triangulation.points_3d_from_matches(pts_left, pts_right)
@@ -143,7 +159,7 @@ class FeaturesMethod(nn.Module):
                 int(left_idx): i
                 for i, left_idx in enumerate(indeces_3d_point_left1)
             }
-            object_points, image_points = self.temporal_matcher(des1, des3, kp3, points_3d, left_idx_to_3d_idx)
+            object_points, image_points = self.temporal_matcher(des1_left_1, des3_left_2, kp3_left_2, points_3d, left_idx_to_3d_idx)
             
             debug['num_pnp_points'] = len(object_points)
             if len(object_points) < self.min_pnp_points:
@@ -186,7 +202,16 @@ class FeaturesMethod(nn.Module):
             tvec_pred = torch.from_numpy(tvec.squeeze())
             
             rvec_pred = RT.from_rotvec(rvec_pred)
-            y_pred = PT.from_rt(rvec_pred, tvec_pred).as_lie()
+            y_pred = PT.from_rt(rvec_pred, tvec_pred).inv()
+            
+            C_cv_to_air = torch.tensor([
+                            [0.0, 0.0, 1.0],
+                            [1.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0],
+                        ], dtype=y_pred.dtype, device=y_pred.device)
+            
+            y_pred = y_pred.change_basis(C_cv_to_air)
+            y_pred = y_pred.as_lie()
             
             debug["success"] = True
             debug["reason"] = "ok"

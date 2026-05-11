@@ -4,5 +4,6 @@ mav0
 datasets
 BestBaseLineResNet18.tar
 databases.tar
-.vscode*.tar
+.vscode
+*.tar
 models_from_github

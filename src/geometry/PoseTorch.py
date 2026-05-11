@@ -160,6 +160,36 @@ class PoseTorch:
         
         return PoseTorch(R_inv, t_inv)
     
+    def change_basis(self, C: torch.Tensor) -> "PoseTorch":
+        '''
+        Переводит позу из одной системы координат в другую
+        C: матрица перехода между базисами формы (3, 3)
+        '''
+
+        if C.shape != (3, 3):
+            raise ValueError(f"C должна иметь форму (3, 3), а получила {C.shape}")
+
+        # Переносим C на тот же device и dtype, что и поза
+        C = C.to(device=self.device, dtype=self.dtype)
+
+        # Достаём матрицу вращения из RotationTorch
+        R_old = self.R.as_matrix()
+
+        # Достаём вектор смещения
+        t_old = self.t
+
+        # Меняем базис вращения
+        R_new = C @ R_old @ C.T
+
+        # Меняем базис смещения
+        t_new = C @ t_old
+
+        # Собираем новую позу
+        return PoseTorch.from_rt(
+            RotationTorch.from_matrix(R_new),
+            t_new
+        )
+    
     def compose(self, other: 'PoseTorch') -> 'PoseTorch':
         '''
         Композиция двух поз по формулам:
