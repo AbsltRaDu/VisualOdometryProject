@@ -9,8 +9,7 @@ import plotly.graph_objects as go
 
 from dataloaders.datasets import mavDatasetCNN_RAFT
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
-from src.models.CNN_RAFT import RAFTPoseCNN
-from src.models.DeepVO import DeepVO, PairwiseVOModel
+from src.models.CNN_LiteFlowNet import LiteFlowNetPoseCNN
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
@@ -39,9 +38,9 @@ dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
 print('Длина датасета:', len(dataset), sep=' ')
 
-model_cnn = RAFTPoseCNN()
+model_cnn = LiteFlowNetPoseCNN()
 
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNN_RAFT.tar', map_location=device)
+state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNN_LiteFlowNet.tar', map_location=device)
 model_cnn.load_state_dict(state_dict_cnn)
 model_cnn = model_cnn.to(device)
 

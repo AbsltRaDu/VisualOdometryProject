@@ -7,7 +7,7 @@ from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import Subset
 
-from src.dataloaders.datasets_for_CNN_RAFT import mavDatasetCNN_RAFT, SequenceDataset_RAFT
+from dataloaders.datasets import mavDatasetCNN_RAFT, SequenceDataset_RAFT
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 from src.models.CNN_RAFT import RAFTPoseCNN, RAFTPoseCNNEncoder
