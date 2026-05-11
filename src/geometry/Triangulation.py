@@ -54,9 +54,17 @@ class Triangulation:
         
         disparity = left[..., 0] - right[..., 0]
         
+        # print("disparity min:", disparity.min())
+        # print("disparity mean:", disparity.mean())
+        # print("disparity max:", disparity.max())
+        
         valid = disparity > 1e-6 # TODO продумать вариант гибкого фильтра
 
         Z = np.full_like(disparity, fill_value=np.nan, dtype=np.float64)
+        
+        # print("Z min:", np.nanmin(Z))
+        # print("Z mean:", np.nanmean(Z))
+        # print("Z max:", np.nanmax(Z))
         
         Z[valid] = self.fx * self.baseline / disparity[valid]
         

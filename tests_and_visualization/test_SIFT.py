@@ -24,7 +24,7 @@ transform = T.Compose([
 normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
-lst_of_dataset_train = lst_of_dataset[-2]
+# lst_of_dataset_train = lst_of_dataset[-2]
 lst_of_dataset_test = lst_of_dataset[-1]
 
 dataset = mavDataset('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
@@ -33,13 +33,13 @@ dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')
 
 
-# detect = cv2.SIFT_create(nfeatures=3000)
-# matcher = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=False)
+detect = cv2.SIFT_create(nfeatures=8000)
+matcher = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=False)
 
-detect = cv2.ORB_create(nfeatures=3000)
-matcher = cv2.BFMatcher(normType=cv2.NORM_HAMMING, crossCheck=False)
+# detect = cv2.ORB_create(nfeatures=8000, scaleFactor=1.2, nlevels=8, patchSize=31, fastThreshold=7)
+# matcher = cv2.BFMatcher(normType=cv2.NORM_HAMMING, crossCheck=False)
 
-model = FeaturesMethod(752, 480, 752, 480, 90, 0.12, detection_algoritm=detect, matcher=matcher, return_debug=True)
+model = FeaturesMethod(752, 480, 752, 480, 90, 0.2, detection_algoritm=detect, matcher=matcher, return_debug=True)
 
 trajectory = []
 trajectory_pred = []
@@ -50,19 +50,31 @@ dtrain = iter(dtrain)
 model.eval()
 with torch.no_grad():
     
-    img1, img3, img2, img4, y, pose = next(dtrain)
+    img_left_1, img_right_1, img_left_2, img_right_2, y, pose = next(dtrain)
     
-    print(img1.shape)
+    print(img_left_1.shape)
     
-    img1 = img1[0].numpy().astype(np.uint8)
-    img2 = img2[0].numpy().astype(np.uint8)
-    img3 = img3[0].numpy().astype(np.uint8)
+    img_left_1 = img_left_1[0].numpy().astype(np.uint8)
+    img_right_1 = img_right_1[0].numpy().astype(np.uint8)
+    img_left_2 = img_left_2[0].numpy().astype(np.uint8)
 
     pose = pose
-    y_pred, debug = model(img1, img3, img2)
+    y_pred, debug = model(img_left_1, img_right_1, img_left_2)
     y_pred = y_pred.unsqueeze(0)
     y = y
 
+    
+    # print("GT y:")
+    # print(y)
+
+    # print("PnP y_pred:")
+    # print(y_pred)
+    
+    # print("GT translation norm:",
+    #   torch.linalg.norm(y[..., :3]))
+
+    # print("PnP translation norm:",
+    #     torch.linalg.norm(y_pred[..., :3]))
     
     if not debug.get('success'):
         print(debug)
@@ -76,13 +88,13 @@ with torch.no_grad():
     
     dataset_train = tqdm(dtrain, desc=f'Поехали', position=0)
     for item in dataset_train:
-        img1, img3, img2, img4, y, _ = item
+        img_left_1, img_right_1, img_left_2, img_right_2, y, _ = item
         
-        img1 = img1[0].numpy().astype(np.uint8)
-        img2 = img2[0].numpy().astype(np.uint8)
-        img3 = img3[0].numpy().astype(np.uint8)
+        img_left_1 = img_left_1[0].numpy().astype(np.uint8)
+        img_right_1 = img_right_1[0].numpy().astype(np.uint8)
+        img_left_2 = img_left_2[0].numpy().astype(np.uint8)
         
-        y_pred, debug = model(img1, img3, img2)
+        y_pred, debug = model(img_left_1, img_right_1, img_left_2)
         y_pred = y_pred.unsqueeze(0)
 
         
