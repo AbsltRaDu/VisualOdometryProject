@@ -2,6 +2,11 @@
 Датасет outdoor: https://fpv.ifi.uzh.ch/<br>
 Для генерации синтетики был написан отдельный проект на базе AirSim Microsoft: https://github.com/AbsltRaDu/AirSimDatasetCreator<br>
 
+Модуль геометрии:
+```
+src/geometry
+```
+
 Веса сетей по пути:
 ```
 process_of_fitting/fitting_models
