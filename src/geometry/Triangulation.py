@@ -47,35 +47,46 @@ class Triangulation:
             [0.0, 0.0, 1.0],
         ], dtype=np.float64)
         
-    def disparity_and_depth(self, left: np.ndarray, right: np.ndarray):
+    def disparity_and_depth(self, left: np.ndarray, right: np.ndarray, disparity_map: np.ndarray = None):
         '''
         Восстанавливает глубину по стерео-точкам, возвращает диспаритет
         '''
-        
-        disparity = left[..., 0] - right[..., 0]
-        
-        # print("disparity min:", disparity.min())
-        # print("disparity mean:", disparity.mean())
-        # print("disparity max:", disparity.max())
-        
-        valid = disparity > 1e-6 # TODO продумать вариант гибкого фильтра
+        if disparity_map is None:
+            disparity = left[..., 0] - right[..., 0]
+            valid = disparity > 1e-6 # TODO продумать вариант гибкого фильтра
+        else:
+            h, w = disparity_map.shape
 
-        Z = np.full_like(disparity, fill_value=np.nan, dtype=np.float64)
+            x_i = np.round(left[:, 0]).astype(np.int32)
+            y_i = np.round(left[:, 1]).astype(np.int32)
+
+            # Проверяем, что keypoints попали внутрь изображения
+            inside = (
+                (x_i >= 0) & (x_i < w) &
+                (y_i >= 0) & (y_i < h)
+            )
+
+            disparity = np.full(len(left), np.nan, dtype=np.float32)
+
+            # Берём disparity из карты только для валидных пикселей
+            disparity[inside] = disparity_map[y_i[inside], x_i[inside]]
+            valid = inside & (disparity > 1e-1)
         
-        # print("Z min:", np.nanmin(Z))
-        # print("Z mean:", np.nanmean(Z))
-        # print("Z max:", np.nanmax(Z))
+        
+
+        Z = np.full(len(left), fill_value=np.nan, dtype=np.float64)
         
         Z[valid] = self.fx * self.baseline / disparity[valid]
         
         return Z, disparity, valid
     
-    def points_3d_from_matches(self, left: np.ndarray, right: np.ndarray):
+    def points_3d_from_matches(self, left: np.ndarray, right: np.ndarray, disparity: np.ndarray = None):
         '''
         Восстанавливает 3D точки по матчу стерео-точкам
         '''
         
-        Z, disparity, valid = self.disparity_and_depth(left, right)
+        Z, disparity, valid = self.disparity_and_depth(left, right, disparity)
+        valid = valid & np.isfinite(Z) & (Z > 0.0) & (Z < 100.0)
 
         # Берём только валидные точки
         x = left[..., 0][valid]
