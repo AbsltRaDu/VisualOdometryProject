@@ -4,12 +4,12 @@ from torchvision import transforms as T
 import os
 from torchvision.models.optical_flow import raft_small
 
-from dataloaders.datasets import mavDatasetCNN_RAFT
+from src.dataloaders.datasetsINS import mavDatasetINS
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 
 
-from models_from_github.liteflownet.run import Network
+# from models_from_github.liteflownet.run import Network
 
 
 
@@ -27,9 +27,16 @@ lst_of_dataset = os.listdir('datasets/simulation')
 lst_of_dataset_train = lst_of_dataset[:-1]
 lst_of_dataset_test = lst_of_dataset[-1]
 
-model = Network()
-model = model.to(device)
+dataset_train = mavDatasetINS('datasets/simulation', transform=transform, lst_of_datasets=lst_of_dataset_test)
 
-print(model)
+print('Длина датасета:', len(dataset_train), sep=' ')
+
+img_left_1, img_right_1, img_left_2, img_right_2, imu, imu_t, y, T_m = dataset_train[354]
+
+print(imu_t)
+print(imu.shape)
+print(imu)
+
+
 
 
