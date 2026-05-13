@@ -104,13 +104,13 @@ class FeaturesMethod(nn.Module):
         rvec_pred = RT.from_rotvec(rvec_pred)
         y_pred = PT.from_rt(rvec_pred, tvec_pred).inv()
         
-        C_cv_to_air = torch.tensor([
-                        [0.0, 0.0, 1.0],
-                        [1.0, 0.0, 0.0],
-                        [0.0, 1.0, 0.0],
-                    ], dtype=y_pred.dtype, device=y_pred.device)
+        # C_cv_to_air = torch.tensor([
+        #                 [0.0, 0.0, 1.0],
+        #                 [1.0, 0.0, 0.0],
+        #                 [0.0, 1.0, 0.0],
+        #             ], dtype=y_pred.dtype, device=y_pred.device)
         
-        y_pred = y_pred.change_basis(C_cv_to_air)
+        # y_pred = y_pred.change_basis(C_cv_to_air)
         y_pred = y_pred.as_lie()
         
         debug["success"] = True

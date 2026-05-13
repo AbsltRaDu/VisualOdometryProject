@@ -101,46 +101,36 @@ class mavDatasetINS(mavDataset):
             i0 = bisect.bisect_left(imu_keys_sorted, t0)
             i1 = bisect.bisect_left(imu_keys_sorted, t1)
             
-            imu_slice = [dct_of_timestamp_imu[t] for t in imu_t]
+            imu_t = imu_keys_sorted[i0:i1]
             
-            # # проходим по отсортированным ключам
-            # # TODO прогон с нуля как бдуто дофига
-            # for t in imu_keys_sorted:
-                
-            #     if t < t0:
-            #         continue
-                
-            #     if t >= t1:
-            #         break  
-                
-            #     # добавляем IMU запись
-            #     imu = dct_of_timestamp_imu[t]
-                
-            #     imu_t.append(t)
-            #     imu_slice.append(imu) # конкретная поза по данным с ins
+            if len(imu_t) < 2:
+                imu_t = [t0, t1]    
             
-            # Продумать перевод в секунды для perv_count()
+            imu_t = imu_t[-(k+1):]
+            dt = [(_time1 - _time0) * 1e-9 for _time0, _time1 in zip(imu_t[:-1], imu_t[1:])] if len(imu_t) >= 2  else [(t1 - t0) * 1e-9]
             
+            
+            imu_slice = [dct_of_timestamp_imu[t] for t in imu_t[1:]]    
                 
             if len(imu_slice) == 0:
                 imu_slice.append([0, 0, 0, 0, 0, 0])
                 
-            
-            imu_slice = imu_slice[-k:] # Фиксируем длину
-            imu_t = imu_t[-k:]
-            t = (i0 - i1) * 1e-9 if len(imu_t) >= 2 else (t1 - t0) * 1e-9
-            
+                
             if len(imu_slice) < k:
                 pad_size = k - len(imu_slice)
             
                 pad_value = imu_slice[0]
+                pad_value_t = dt[0]
             
                 pad = [pad_value.copy() for _ in range(pad_size)]
+                pad_t = [pad_value_t for _ in range(pad_size)]
                 imu_slice = pad + imu_slice
-            
+                dt = pad_t + dt
+                
+            dt = torch.tensor(dt, dtype=torch.float64)
             imu_tensor = torch.tensor(imu_slice, dtype=torch.float64)
             lst_imu.append(imu_tensor)
-            lst_dt.append(t)
+            lst_dt.append(dt.unsqueeze(-1))
             
         return lst_imu, lst_dt
     

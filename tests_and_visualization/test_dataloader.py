@@ -31,11 +31,20 @@ dataset_train = mavDatasetINS('datasets/simulation', transform=transform, lst_of
 
 print('Длина датасета:', len(dataset_train), sep=' ')
 
-img_left_1, img_right_1, img_left_2, img_right_2, imu, imu_t, y, T_m = dataset_train[354]
+img_left_1, img_right_1, img_left_2, img_right_2, imu, imu_t, y, T_m = dataset_train[0]
+img_left_1_1, img_right_1_1, img_left_2_1, img_right_2_1, imu_1, imu_t_1, y_1, T_m_1 = dataset_train[0]
 
-print(imu_t)
+imu = torch.stack([imu, imu_1])
+imu_t = torch.stack([imu_t, imu_t_1])
+
 print(imu.shape)
-print(imu)
+print(imu_t.shape)
+
+print(imu[..., 0, 3:])
+print(imu_t[..., 0, :])
+
+print(imu[..., 0, 3:] * imu_t[..., 0, :])
+    
 
 
 

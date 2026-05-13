@@ -25,9 +25,9 @@ normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
 # lst_of_dataset_train = lst_of_dataset[-2]
-lst_of_dataset_test = lst_of_dataset[-1]
+lst_of_dataset_test = ['mav_forward_backward']
 
-dataset = mavDataset('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
+dataset = mavDataset('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test, max_size=1000) # Сразу формируем все массивы на GPU
 dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
 print('Длина датасета:', len(dataset), sep=' ')
@@ -63,18 +63,6 @@ with torch.no_grad():
     y_pred = y_pred.unsqueeze(0)
     y = y
 
-    
-    # print("GT y:")
-    # print(y)
-
-    # print("PnP y_pred:")
-    # print(y_pred)
-    
-    # print("GT translation norm:",
-    #   torch.linalg.norm(y[..., :3]))
-
-    # print("PnP translation norm:",
-    #     torch.linalg.norm(y_pred[..., :3]))
     
     if not debug.get('success'):
         print(debug)
