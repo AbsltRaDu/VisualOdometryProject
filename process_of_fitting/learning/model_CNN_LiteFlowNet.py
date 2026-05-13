@@ -7,10 +7,10 @@ from torch.utils import data
 from torchvision import transforms as T
 from torch.utils.data import Subset
 
-from dataloaders.datasets import mavDatasetCNN_RAFT
+from src.dataloaders.datasets import mavDataset
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
-from src.models.CNN_LiteFlowNet import LiteFlowNetPoseCNN
+from src.models.modelsNN.CNN_LiteFlowNet import LiteFlowNetPoseCNN
 from src.function_of_loss.mse_pose import PoseLoss, PoseLossTrajectory
 from src.piplines.pipline_learning_NN import training_RAFT_progressive
 
@@ -34,8 +34,8 @@ lst_of_dataset_train = lst_of_dataset[:-1]
 lst_of_dataset_test = lst_of_dataset[-1]
 
 
-dataset_train = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
-dataset_test = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test)
+dataset_train = mavDataset('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
+dataset_test = mavDataset('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test)
 
 WINDOW_SIZE = 10
 

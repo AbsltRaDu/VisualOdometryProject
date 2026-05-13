@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 import cv2
 
-from src.classic_models.blocks.Matchers import Matcher, TemporalMatcher, StereoFilter, FundamentalMat
+from src.models.modelsClassic.blocks.Matchers import Matcher, TemporalMatcher, StereoFilter, FundamentalMat
 from src.geometry.Triangulation import TriangulationMod
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.RotationTorch import RotationTorch as RT

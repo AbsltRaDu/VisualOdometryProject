@@ -9,8 +9,8 @@ import plotly.graph_objects as go
 
 from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
-from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
-from src.models.DeepVO import DeepVO, PairwiseVOModel, DeepVORNN
+from src.models.modelsNN.CNN_ResNet50_VO import CNN_ResNet50_VO
+from src.models.modelsNN.DeepVO import DeepVO, PairwiseVOModel
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
 
