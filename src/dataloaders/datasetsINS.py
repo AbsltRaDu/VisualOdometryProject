@@ -22,7 +22,7 @@ from src.dataloaders.datasets import mavDataset
 
 class mavDatasetINS(mavDataset):
     
-    def __init__(self, path, transform=None, normalize=None, device='cpu',  lst_of_datasets=[], max_size=None, num_of_imu=10):
+    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], max_size=None, num_of_imu=10):
         '''
         Расширение датасета с добавление данных IMU для визуально-инерциальной одометрии
         

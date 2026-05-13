@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from src.dataloaders.datasetsINS import mavDatasetINS
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
-from src.modelsINS.PureINS import IMUPreprocessor, INSPropagator, PureINSModel
+from src.models.modelsINS.PureINS import IMUPreprocessor, INSPropagator, PureINSModel
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if torch.cuda.is_available():

@@ -7,10 +7,10 @@ from tqdm import tqdm
 
 import plotly.graph_objects as go
 
-from dataloaders.datasets import mavDatasetCNN_RAFT, SequenceDataset_RAFT
+from src.dataloaders.datasets import mavDataset, SequenceDataset_classic
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
-from src.models.CNN_LiteFlowNet import LiteFlowNetPoseCNN
-from src.models.DeepVO import DeepVO_RAFT
+from models.modelsNN.CNN_LiteFlowNet import LiteFlowNetPoseCNN
+from models.modelsNN.DeepVO import DeepVO_RAFT
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
@@ -34,8 +34,8 @@ lst_of_dataset = os.listdir('datasets/simulation')
 lst_of_dataset_train = lst_of_dataset[-2]
 lst_of_dataset_test = lst_of_dataset[-1]
 
-dataset = mavDatasetCNN_RAFT('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
-dataset = SequenceDataset_RAFT(dataset, seq=1)
+dataset = mavDataset('datasets/simulation', transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test) # Сразу формируем все массивы на GPU
+dataset = SequenceDataset_classic(dataset, seq=1)
 dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
 print('Длина датасета:', len(dataset), sep=' ')

@@ -10,7 +10,7 @@ from torch.utils.data import Subset
 from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
 from src.dataloaders.Samplers import ProgressiveWindowBatchSampler
 from src.normalize.PoseNormolizerLie import PoseNormalizerLie
-from src.models.CNN_ResNet50_VO import CNN_ResNet50_VO
+from src.models.modelsNN.CNN_ResNet50_VO import CNN_ResNet50_VO
 from src.function_of_loss.mse_pose import PoseLoss, PoseLossTrajectory
 from src.piplines.pipline_learning_NN import training_CNN_progressive
 
