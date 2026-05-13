@@ -1,4 +1,5 @@
 import numpy as np 
+import cv2
 
 class Triangulation:
     '''
@@ -42,9 +43,9 @@ class Triangulation:
         self.cy = cy_orig * scale_y
         
         self.K = np.array([
-            [self.fx, 0.0, self.cx],
-            [0.0, self.fy, self.cy],
-            [0.0, 0.0, 1.0],
+            [self.fx, 0, self.cx],
+            [0, self.fy, self.cy],
+            [0, 0, 1]
         ], dtype=np.float64)
         
     def disparity_and_depth(self, left: np.ndarray, right: np.ndarray, disparity_map: np.ndarray = None):
@@ -100,3 +101,86 @@ class Triangulation:
         points_3d = np.stack([X, Y, z], axis=1).astype(np.float32)
 
         return points_3d, valid
+
+class TriangulationMod(Triangulation):
+    
+    def _get_focus(self):
+        super()._get_focus()
+        
+        self._get_projection_matrices()
+    
+    def _get_projection_matrices(self):
+        '''
+        Создаёт матрицы проекции для левой и правой камеры.
+
+        P_left: Левая камера считается началом координат stereo-системы.
+        P_right: Правая камера сдвинута относительно левой на baseline.
+
+        '''
+
+        # Левая камера: R = I, t = 0
+        Rt_left = np.hstack([
+            np.eye(3, dtype=np.float64),
+            np.zeros((3, 1), dtype=np.float64)
+        ])
+
+        # Правая камера: R = I, t = [-baseline, 0, 0]
+        # Для стандартной rectified stereo часто используют именно -baseline.
+        t_right = np.array([[-self.baseline], [0.0], [0.0]], dtype=np.float64)
+
+        Rt_right = np.hstack([
+            np.eye(3, dtype=np.float64),
+            t_right
+        ])
+
+        # P = K @ [R | t]
+        self.P_left = self.K @ Rt_left
+        self.P_right = self.K @ Rt_right
+        
+    def points_3d_from_cv_triangulate(self, left: np.ndarray, right: np.ndarray):
+        '''
+        Восстанавливает 3D-точки через cv2.triangulatePoints.
+
+        left: точки левого изображения формы (N, 2)
+        right: соответствующие точки правого изображения формы (N, 2)
+        '''
+
+        # Приводим точки к float64
+        left = np.asarray(left, dtype=np.float64)
+        right = np.asarray(right, dtype=np.float64)
+
+        if left.ndim != 2 or left.shape[1] != 2:
+            raise ValueError(f'left должен быть формы (N, 2), получил {left.shape}')
+
+        if right.ndim != 2 or right.shape[1] != 2:
+            raise ValueError(f'right должен быть формы (N, 2), получил {right.shape}')
+
+        if len(left) != len(right):
+            raise ValueError(
+                f'left и right должны иметь одинаковую длину: '
+                f'{len(left)} != {len(right)}'
+            )
+
+        
+        pts_left = left.T
+        pts_right = right.T
+
+        
+        points_4d = cv2.triangulatePoints(
+            self.P_left,
+            self.P_right,
+            pts_left,
+            pts_right
+        )
+
+        w = points_4d[3]
+        valid_w = np.abs(w) > 1e-8
+
+        points_3d = np.full((len(left), 3), np.nan, dtype=np.float64)
+        points_3d[valid_w] = (points_4d[:3, valid_w] / w[valid_w]).T
+
+        Z = points_3d[:, 2]
+
+        valid = (valid_w & np.isfinite(points_3d).all(axis=1) & (Z > 0.0) & (Z < 100.0))
+
+        return points_3d[valid].astype(np.float32), valid

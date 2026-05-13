@@ -24,9 +24,9 @@ normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
 # lst_of_dataset_train = lst_of_dataset[-2]
-lst_of_dataset_test = lst_of_dataset[-6]
+lst_of_dataset_test = lst_of_dataset[-1]
 
-dataset = mavDatasetINS('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test, max_size=1000) # Сразу формируем все массивы на GPU
+dataset = mavDatasetINS('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test, num_of_imu=12) # Сразу формируем все массивы на GPU
 dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 
 print('Длина датасета:', len(dataset), sep=' ')
