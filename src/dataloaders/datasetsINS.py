@@ -28,15 +28,12 @@ class mavDatasetINS(mavDataset):
         
         '''
         
-        
-        
-        
         self.transform = transform
         self.path = path
         self.device=device
         self.dataset_group = []
         self.max_size = max_size
-        self.num_of_imu = 10
+        self.num_of_imu = num_of_imu
         
         self.normalize = normalize
         
@@ -97,6 +94,7 @@ class mavDatasetINS(mavDataset):
             
             imu_slice = []
             imu_t = []
+            mark = True
             
             i0 = bisect.bisect_left(imu_keys_sorted, t0)
             i1 = bisect.bisect_left(imu_keys_sorted, t1)
@@ -105,12 +103,14 @@ class mavDatasetINS(mavDataset):
             
             if len(imu_t) < 2:
                 imu_t = [t0, t1]    
+                mark = False
+            
             
             imu_t = imu_t[-(k+1):]
             dt = [(_time1 - _time0) * 1e-9 for _time0, _time1 in zip(imu_t[:-1], imu_t[1:])] if len(imu_t) >= 2  else [(t1 - t0) * 1e-9]
-            
-            
-            imu_slice = [dct_of_timestamp_imu[t] for t in imu_t[1:]]    
+                
+            if mark:
+                imu_slice = [dct_of_timestamp_imu[t] for t in imu_t[1:]]    
                 
             if len(imu_slice) == 0:
                 imu_slice.append([0, 0, 0, 0, 0, 0])

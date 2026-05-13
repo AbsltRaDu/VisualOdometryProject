@@ -6,7 +6,7 @@ import numpy as np
 import cv2
 
 from src.classic_models.blocks.Matchers import Matcher, TemporalMatcher, StereoFilter, FundamentalMat
-from src.geometry.Triangulation import Triangulation
+from src.geometry.Triangulation import TriangulationMod
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.RotationTorch import RotationTorch as RT
 
@@ -43,7 +43,7 @@ class FeaturesMethod(nn.Module):
         self.stereo_filter = StereoFilter()
         self.fm = FundamentalMat()
         self.temporal_matcher = TemporalMatcher(matcher=matcher, k=k_match)
-        self.triangulation = Triangulation(self.width, self.height, self.new_width, self.new_height, self.fov_deg, self.baseline)
+        self.triangulation = TriangulationMod(self.width, self.height, self.new_width, self.new_height, self.fov_deg, self.baseline)
         
         self.min_stereo_matches = min_stereo_matches
         self.min_3d_points = min_3d_points
@@ -149,7 +149,7 @@ class FeaturesMethod(nn.Module):
             
             # Блок мэтчинга
             good_matches = self.matcher(des1_left_1, des2_right_1)
-            # good_matches = self.stereo_filter(good_matches, kp1_left_1, kp2_right_1)
+            good_matches = self.stereo_filter(good_matches, kp1_left_1, kp2_right_1)
             
             debug['num_stereo_matches'] = len(good_matches)
             if len(good_matches) < self.min_stereo_matches:
@@ -173,7 +173,7 @@ class FeaturesMethod(nn.Module):
             #     )
             
             # Блок триангуляции
-            points_3d, valid = self.triangulation.points_3d_from_matches(pts_left, pts_right, disparity)
+            points_3d, valid = self.triangulation.points_3d_from_cv_triangulate(pts_left, pts_right)
             
             debug['num_3d_points'] = len(points_3d)
             if len(points_3d) < self.min_3d_points:

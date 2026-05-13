@@ -25,9 +25,9 @@ normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
 lst_of_dataset_train = lst_of_dataset[:-1]
-lst_of_dataset_test = lst_of_dataset[-1]
+lst_of_dataset_test = lst_of_dataset[-3]
 
-dataset_train = mavDatasetINS('datasets/simulation', transform=transform, lst_of_datasets=lst_of_dataset_test)
+dataset_train = mavDatasetINS('datasets/simulation', transform=transform, lst_of_datasets=lst_of_dataset_test, num_of_imu=20)
 
 print('Длина датасета:', len(dataset_train), sep=' ')
 
@@ -37,13 +37,10 @@ img_left_1_1, img_right_1_1, img_left_2_1, img_right_2_1, imu_1, imu_t_1, y_1, T
 imu = torch.stack([imu, imu_1])
 imu_t = torch.stack([imu_t, imu_t_1])
 
-print(imu.shape)
-print(imu_t.shape)
+for d in dataset_train:
+    img_left_1, img_right_1, img_left_2, img_right_2, imu, imu_t, y, T_m = d
+    print(imu.shape)
 
-print(imu[..., 0, 3:])
-print(imu_t[..., 0, :])
-
-print(imu[..., 0, 3:] * imu_t[..., 0, :])
     
 
 

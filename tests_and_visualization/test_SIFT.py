@@ -25,7 +25,7 @@ normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
 # lst_of_dataset_train = lst_of_dataset[-2]
-lst_of_dataset_test = ['mav_forward_backward']
+lst_of_dataset_test = lst_of_dataset[-1]
 
 dataset = mavDataset('datasets/simulation', transform=transform, normalize=normalize, device='cpu', lst_of_datasets=lst_of_dataset_test, max_size=1000) # Сразу формируем все массивы на GPU
 dtrain = data.DataLoader(dataset=dataset, batch_size=1)
@@ -33,10 +33,10 @@ dtrain = data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')
 
 
-detect = cv2.SIFT_create(nfeatures=8000)
+detect = cv2.SIFT_create(nfeatures=12000)
 matcher = cv2.BFMatcher(normType=cv2.NORM_L2, crossCheck=False)
 
-# detect = cv2.ORB_create(nfeatures=8000, scaleFactor=1.2, nlevels=8, patchSize=31, fastThreshold=7)
+# detect = cv2.ORB_create(nfeatures=500, scaleFactor=1.2, nlevels=8, patchSize=31, fastThreshold=7)
 # matcher = cv2.BFMatcher(normType=cv2.NORM_HAMMING, crossCheck=False)
 
 model = FeaturesMethod(752, 480, 752, 480, 90, 0.2, detection_algoritm=detect, matcher=matcher, return_debug=True)
@@ -64,8 +64,8 @@ with torch.no_grad():
     y = y
 
     
-    if not debug.get('success'):
-        print(debug)
+    # if not debug.get('success'):
+    #     print(debug)
     
     if normalize:
         y_pred = normalize.denormalize(y_pred)
@@ -86,8 +86,8 @@ with torch.no_grad():
         y_pred = y_pred.unsqueeze(0)
 
         
-        if not debug.get('success'):
-            print(debug)
+        # if not debug.get('success'):
+        #     print(debug)
         
         if normalize:
             y_pred = normalize.denormalize(y_pred)

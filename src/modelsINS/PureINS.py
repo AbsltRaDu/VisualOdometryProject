@@ -147,6 +147,7 @@ class INSPropagator:
         velocity_new = velocity + a_world * dt
 
         pose_new = PoseTorch.from_rt(R=R_new, t=p_new)
+        
 
         self.debug = {
             "gyro": gyro.detach(),
