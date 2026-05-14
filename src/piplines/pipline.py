@@ -11,6 +11,158 @@ from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
 
 from src.function_of_loss.mse_pose import PoseLossTrajectory, PoseLoss
 
+
+
+class TrainObject:
+    
+    def __init__(self, hidden, pred_pose0, localLoss, globalLoss, optimizer, weight_pose, weight_trajectory, window_size, device):
+        
+        self.hidden = hidden
+        self.pred_pose0 = pred_pose0
+        
+        self.loss = localLoss
+        self.loss_func_trajectory = globalLoss
+        
+        self.optimizer = optimizer
+        
+        self.weight_pose = weight_pose
+        self.weight_trajectory = weight_trajectory
+        self.window_size = window_size
+        
+        self.device = device 
+    
+    
+    def __call__(self, out, model):
+        '''
+        Инициализация параметров обучения
+        '''
+        
+        self.x_train = out[0].to(self.device) 
+        self.imu = out[1].to(self.device) 
+        self.y_train = out[2].to(self.device)
+        pose = out[3].to(self.device)
+        self.pose = PT.from_lie(pose)
+        
+        self.model = model
+        
+    def get_predict(self, dct):
+        '''
+        Получение предикта
+        '''
+        
+        if self.hidden is not None:
+            self.hidden = self.model.detach_hidden(self.hidden) # отрубили от графа вычислений предыдущий скрытый слой
+        
+        predict, hidden = self.model(dct['x_train'].to(dtype=torch.float32), dct['imu'].to(dtype=torch.float32), self.hidden) # 6D Вектор алгебры Ли 
+
+        self.predict = predict
+        self.hidden = hidden
+        
+    def take_predict_after_norm(self, predict):
+        self.predict_denorm = predict
+    
+    def get_localLoss(self, lm_count):
+        '''
+        Рассчет локальной ошибки
+        '''
+        
+        predict = self.predict
+        
+        # Блок рассчета ошибки позы
+        loss_pose = self.loss(predict, self.y_train)
+        
+        self.loss_pose_mean = 1 / lm_count * loss_pose.item() + (1 - 1 / lm_count) * self.loss_pose_mean
+        self.loss_pose = loss_pose
+        
+    def get_globalLossMetrice(self):
+        '''
+        Рассчет метрики ошибки глобальной траектории на последовательности
+        '''
+        predict = self.predict_denorm
+        pred_pose0 = self.pred_pose0
+        
+        if pred_pose0 is None:
+            pred_pose0 = self.pose
+            self.trajectory_fact_metric = TT.from_lie_relative(self.y_train, pred_pose0)
+            self.trajectory_pred_metric = TT.from_lie_relative(predict.detach(), pred_pose0)
+        else:
+            trajectory_fact_metric = self.trajectory_fact_metric
+            trajectory_pred_metric = self.trajectory_pred_metric
+            
+            pred_pose0 = pred_pose0.detach() # Отрубаем предыдущую позу от графа вычислений
+            self.trajectory_fact_metric = trajectory_fact_metric.extend_lie_relative(self.y_train)
+            self.trajectory_pred_metric = trajectory_pred_metric.extend_lie_relative(predict.detach())
+
+        with torch.no_grad():
+            loss_t_metric_global = self.loss_func_trajectory(trajectory_pred_metric[:-1], trajectory_fact_metric[:-1])
+        
+        self.loss_mean_trajectory_metric = 1 / self.lm_count_trajectory * loss_t_metric_global.item() + (1 - 1 / self.lm_count_trajectory) * self.loss_mean_trajectory_metric
+        
+        self.trajectory_fact_metric = trajectory_fact_metric
+        self.trajectory_pred_metric = trajectory_pred_metric
+        self.pred_pose0 = pred_pose0
+        
+        
+    def get_globalLoss(self, lm_count_trajectory):
+        
+        predict = self.predict_denorm
+        
+        fact_pose = self.pose
+        pred_pose0 = self.pred_pose0
+        
+        trajectory_fact = TT.from_absolute(fact_pose)
+        trajectory = TT.from_lie_relative(predict, pred_pose0)    
+        pred_pose0 = trajectory[-2].poses # Сохранили старую позу
+        
+        loss_t = self.loss_func_trajectory(trajectory[:-1], trajectory_fact)
+        self.loss_mean_trajectory = 1 / lm_count_trajectory * loss_t.item() + (1 - 1 / lm_count_trajectory) * self.loss_mean_trajectory
+
+        self.pred_pose0 = pred_pose0
+        self.loss_t = loss_t
+        
+    def step_grad(self, step, lm_count):
+        loss_pose = self.loss_pose
+        loss_translation = self.loss_t
+        
+        loss = self.weight_pose  * loss_pose
+            
+        if (step + 1) % self.window_size == 0:
+            self.hidden = None
+            self.pred_pose0 = None
+            loss += self.weight_trajectory * loss_translation
+        
+        loss.backward() # TODO нужно ли масштабирование?
+        self.loss_mean = 1 / lm_count * loss.item() + (1 - 1 / lm_count) * self.loss_mean
+        
+        self.optimizer.step()
+        self.optimizer.zero_grad()
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class trainingProgressiveVIO:
     
     def __init__(self, train_data, test_data, model, loss_func_pose, 
@@ -65,86 +217,80 @@ class trainingProgressiveVIO:
         
         self.lm_count = 0
         self.lm_count_trajectory = 0
-        
     
-    def _train(self, epoch):
+    def _metrices_test(self, step, dct):
+        trajectory_fact_metric = dct['trajectory_fact_metric']
+        trajectory_pred_metric = dct['trajectory_pred_metric']
+        
+        
+        if (step + 1) % self.window_size == 0:
+            dct['hidden'] = None
+            dct['pred_pose0'] = None
+            
+            self.path_lengh = trajectory_fact_metric.path_length()
+
+            loss_t_metric_global = self.loss_func_trajectory(trajectory_pred_metric, trajectory_fact_metric)
+            p_mean_loc = translation_rmse_drift(self.loss_func_pose.pos_loss, self.path_lengh)
+            r_mean_loc = rotation_rmse_drift(self.loss_func_pose.r_loss, self.path_lengh)
+
+            self.loss_mean_test_trajectory = 1 / self.lm_count_trajectory * loss_t_metric_global.item() + (1 - 1 / self.lm_count_trajectory) * self.loss_mean_test_trajectory
+            self.p_mean = 1 / self.lm_count_trajectory * p_mean_loc.mean().item() + (1 - 1 / self.lm_count_trajectory) * self.p_mean
+            self.r_mean = 1 / self.lm_count_trajectory * r_mean_loc.mean().item() + (1 - 1 / self.lm_count_trajectory) * self.r_mean
+    
+    
+    def _train(self, epoch, dct):
         train_bar = tqdm(self.train_data, desc=f'Эпоха тренировочная {epoch+1}/{self._end}', position=0)
             
         self.model.train()
         
-        hidden = None
-        pred_pose0 = None
+        train = TrainObject(
+            hidden=None, 
+            pred_pose0=None,
+            localLoss=self.loss_func_pose,
+            globalLoss=self.loss_func_trajectory,
+            optimizer=self.optimizer,
+            weight_pose=self.weight_pose,
+            weight_trajectory=self.weight_trajectory,
+            window_size=self.window_size,
+            device=self.device
+        )
         
-        for step, (x_train, imu, _, y_train, pose) in enumerate(train_bar):
-            x_train = x_train.to(self.device) 
-            imu = imu.to(self.device) 
-            y_train = y_train.to(self.device)
-            pose = pose.to(self.device)
-
-            if hidden is not None:
-                hidden = self.model.detach_hidden(hidden) # отрубили от графа вычислений предыдущий скрытый слой
+        for step, out in enumerate(train_bar):
             
-            predict, hidden = self.model(x_train.to(dtype=torch.float32), imu.to(dtype=torch.float32), hidden) # 6D Вектор алгебры Ли 
-            predict = predict
             
-            # Блок рассчета ошибки позы
-            loss_pose = self.loss_func_pose(predict, y_train)
+            train(out) # инициализировали параметры обучения
+            train.get_predict() # Сделал прогноз
+            
             self.lm_count += 1
-            self.loss_pose_mean_train = 1 / self.lm_count * loss_pose.item() + (1 - 1 / self.lm_count) * self.loss_pose_mean_train
+            train.get_localLoss(self.lm_count)
             
-            # блок денормализации
             if self.normalize:
+                predict = train.predict
                 predict = self.normalize.denormalize(predict)
+                train.take_predict_after_norm(predict)
             
-            # Блок рассчета ошибки окна
             self.lm_count_trajectory += 1
-            fact_pose = PT.from_lie(pose)
-            if pred_pose0 is None:
-                pred_pose0 = fact_pose[0]
-                trajectory_fact_metric = TT.from_lie_relative(y_train, pred_pose0)
-                trajectory_pred_metric = TT.from_lie_relative(predict.detach(), pred_pose0)
-            else:
-                pred_pose0 = pred_pose0.detach() # Отрубаем предыдущую позу от графа вычислений
-                trajectory_fact_metric = trajectory_fact_metric.extend_lie_relative(y_train)
-                trajectory_pred_metric = trajectory_pred_metric.extend_lie_relative(predict.detach())
+            train.get_globalLoss
+            dct = self._globalLoss(dct) # Ф-ия ошибки на окне
             
-            trajectory_fact = TT.from_absolute(fact_pose)
-            trajectory = TT.from_lie_relative(predict, pred_pose0)    
-            pred_pose0 = trajectory[-2].poses # Сохранили старую позу
+            dct = self._step_grad(step, dct)
             
-            loss_t = self.loss_func_trajectory(trajectory[:-1], trajectory_fact)
-            self.loss_mean_train_trajectory = 1 / self.lm_count_trajectory * loss_t.item() + (1 - 1 / self.lm_count_trajectory) * self.loss_mean_train_trajectory
-
-            # Чтоб не дай бог градиент не посчитался по всей последовательности
-            with torch.no_grad():
-                loss_t_metric_global = self.loss_func_trajectory(trajectory_pred_metric[:-1], trajectory_fact_metric[:-1])
-            self.loss_mean_trajectory_metric = 1 / self.lm_count_trajectory * loss_t_metric_global.item() + (1 - 1 / self.lm_count_trajectory) * self.loss_mean_trajectory_metric
-            
-            loss = self.weight_pose  * loss_pose
-            
-            
-            if (step + 1) % self.window_size == 0:
-                hidden = None
-                pred_pose0 = None
-                loss += self.weight_trajectory * loss_t
-            
-            loss.backward() # TODO нужно ли масштабирование?
-            self.loss_mean_train = 1 / self.lm_count * loss.item() + (1 - 1 / self.lm_count) * self.loss_mean_train
-            
-            self.optimizer.step()
-            self.optimizer.zero_grad()
+            loss_mean_train = dct['loss_mean']
+            loss_pose_mean_train = dct['loss_pose_mean']
+            loss_mean_train_trajectory = dct['loss_mean_trajectory']
+            loss_mean_trajectory_metric = dct['loss_mean_trajectory_metric']
             
             train_bar.set_postfix({
-                'loss': self.loss_mean_train,
-                'loss_pose': self.loss_pose_mean_train,
-                'loss_trajectory_win': self.loss_mean_train_trajectory,
-                'loss_trajectory_gl': self.loss_mean_trajectory_metric
+                'loss': loss_mean_train,
+                'loss_pose': loss_pose_mean_train, 
+                'loss_trajectory_win': loss_mean_train_trajectory,
+                'loss_trajectory_gl': loss_mean_trajectory_metric
             })
         
         self.optimizer.step()
         self.optimizer.zero_grad()
     
-    def _test(self, epoch):
+    def _test(self, epoch, dct):
         
         self.model.eval()
             
@@ -153,53 +299,33 @@ class trainingProgressiveVIO:
         self.lm_count = 0
         self.lm_count_trajectory = 0
         
-        hidden = None
-        pred_pose0 = None 
-        loss_t_metric_global = 0 # При инициализации
+        dct['hidden'] = None
+        dct['pred_pose0'] = None 
+        dct['loss_t_metric_global'] = 0 # При инициализации
         
         # TODO доделать оконный метод
-        for step, (x_test, imu_test, _, y_val, pose) in enumerate(val_bar):
-            x_test = x_test.to(self.device) 
-            imu_test = imu_test.to(self.device) 
-            y_val = y_val.to(self.device)
-            pose = pose.to(self.device)
+        for step, out in enumerate(val_bar):
+            
+            dct = self._init_params(out) # инициализировали параметры валидации
             
             with torch.no_grad():
-                predict, hidden = self.model(x_test.to(dtype=torch.float32), imu_test.to(dtype=torch.float32), hidden)
-                predict = predict
+                dct = self._predict(dct) # Сделали прогноз
                 
-                loss_pose = self.loss_func_pose(predict, y_val)
+                self.lm_count += 1
+                dct = self._localLoss(dct) # Оптимизировали локальную ф-ию
                 
                 if self.normalize:
+                    predict = dct['predict']
                     predict = self.normalize.denormalize(predict)
+                    dct['predict'] = predict
 
-                
-                fact_pose = PT.from_lie(pose)
-                if pred_pose0 is None:
-                    pred_pose0 = fact_pose[0]
-                    trajectory_fact_metric = TT.from_lie_relative(y_val, pred_pose0)
-                    trajectory_pred_metric = TT.from_lie_relative(predict, pred_pose0)
-                    
-                else:
-                    trajectory_fact_metric = trajectory_fact_metric.extend_lie_relative(y_val)
-                    trajectory_pred_metric = trajectory_pred_metric.extend_lie_relative(predict)
-
-            if (step + 1) % self.window_size == 0:
-                hidden = None
-                pred_pose0 = None
                 self.lm_count_trajectory += 1
-                self.path_lengh = trajectory_fact_metric.path_length()
-
-                loss_t_metric_global = self.loss_func_trajectory(trajectory_pred_metric, trajectory_fact_metric)
-                p_mean_loc = translation_rmse_drift(self.loss_func_pose.pos_loss, self.path_lengh)
-                r_mean_loc = rotation_rmse_drift(self.loss_func_pose.r_loss, self.path_lengh)
-
-                self.loss_mean_test_trajectory = 1 / self.lm_count_trajectory * loss_t_metric_global.item() + (1 - 1 / self.lm_count_trajectory) * self.loss_mean_test_trajectory
-                self.p_mean = 1 / self.lm_count_trajectory * p_mean_loc.mean().item() + (1 - 1 / self.lm_count_trajectory) * self.p_mean
-                self.r_mean = 1 / self.lm_count_trajectory * r_mean_loc.mean().item() + (1 - 1 / self.lm_count_trajectory) * self.r_mean
+                dct = self._globalLossMetrice(dct)
                 
-            self.lm_count += 1
-            self.loss_pose_mean_test = 1 / self.lm_count * loss_pose.item() + (1 - 1 / self.lm_count) * self.loss_pose_mean_test
+                
+            
+                
+                
             
             loss = self.weight_pose  * loss_pose + self.weight_trajectory * loss_t_metric_global
             self.loss_mean_test = 1 / self.lm_count * loss.item() + (1 - 1 / self.lm_count) * self.loss_mean_test

@@ -38,6 +38,11 @@ class CNN_ResNet18_VO(nn.Module):
         )
         
     def forward(self, x):
+        '''
+        12-ти канал
+        '''
+        
+        
         x = self.encoder(x)
         p, r = self.fc1(x), self.fc2(x)
         return torch.hstack([p, r]).to(dtype=torch.float64)

@@ -34,8 +34,12 @@ class RAFTPoseCNN(nn.Module):
             nn.Linear(64, 3)
         )
 
-    def forward(self, img1, img2):
-
+    def forward(self, x):
+        '''
+        6-ти канал (B, C, H, W)
+        '''
+        
+        img1, img2 = x[..., :3, :, :], x[..., 3:, :, :]
         flows = self.flow_model(img1, img2)
         flow = flows[-1]  # (B, 2, H, W)
 
@@ -52,7 +56,12 @@ class RAFTPoseCNNEncoder(nn.Module):
         self.flow_model = raft
         self.CNN = cnn
         
-    def forward(self, img1, img2):
+    def forward(self, x):
+        '''
+        6-ти канал (B, C, H, W)
+        '''
+        
+        img1, img2 = x[..., :3, :, :], x[..., 3:, :, :]
         
         flows = self.flow_model(img1, img2)
         flow = flows[-1]  # (B, 2, H, W)

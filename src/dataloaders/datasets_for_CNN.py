@@ -20,12 +20,13 @@ from src.geometry.PoseTorch import PoseTorch as PT
     
 class mavDatasetCNN_3D(data.Dataset):
 
-    def __init__(self, path, transform=None, normalize=None, device='cpu',  lst_of_datasets=[], max_size=None):
+    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None):
         self.transform = transform
         self.path = path
         self.device=device
         self.dataset_group = []
         self.max_size = max_size
+        self.stereo = stereo
         
         self.normalize = normalize
         
@@ -125,28 +126,35 @@ class mavDatasetCNN_3D(data.Dataset):
         # img3, img4 = Image.open(path_to_img3).convert('RGB'), Image.open(path_to_img4).convert('RGB')
         
         img1, img2 = read_image(path_to_img1), read_image(path_to_img2)
-        img3, img4 = read_image(path_to_img3), read_image(path_to_img4)
         
         if img1.shape[0] == 1:
             img1 = img1.repeat(3, 1, 1)
         if img2.shape[0] == 1:
             img2 = img2.repeat(3, 1, 1)
-        if img3.shape[0] == 1:
-            img3 = img3.repeat(3, 1, 1)
-        if img4.shape[0] == 1:
-            img4 = img4.repeat(3, 1, 1)
         
         img1 = img1.float() / 255.0
         img2 = img2.float() / 255.0
-        img3 = img3.float() / 255.0
-        img4 = img4.float() / 255.0
         
-        
+        if self.stereo:
+            img3, img4 = read_image(path_to_img3), read_image(path_to_img4)
+
+            if img3.shape[0] == 1:
+                img3 = img3.repeat(3, 1, 1)
+            if img4.shape[0] == 1:
+                img4 = img4.repeat(3, 1, 1)
+                
+            img3 = img3.float() / 255.0
+            img4 = img4.float() / 255.0
+            
+            
         x = None
         if self.transform:
             img1, img2 = self.transform(img1), self.transform(img2)
-            img3, img4 = self.transform(img3), self.transform(img4)
-            x = torch.concat((img1, img3, img2, img4))
+            if self.stereo:
+                img3, img4 = self.transform(img3), self.transform(img4)
+                x = torch.concat((img1, img3, img2, img4))
+            else:
+                x = torch.concat((img1, img2))
         
         return x
     
@@ -179,10 +187,9 @@ class mavDatasetCNN_3D(data.Dataset):
 
 class mavDatasetVIO(mavDatasetCNN_3D):
     
-    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], max_size=None, num_of_imu=10):
+    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None, num_of_imu=10, get_imu_t: bool = False):
         '''
         Расширение mavDatasetCNN_3D с добавление IMU
-        
         '''
         
         self.transform = transform
@@ -191,6 +198,8 @@ class mavDatasetVIO(mavDatasetCNN_3D):
         self.dataset_group = []
         self.max_size = max_size
         self.num_of_imu = num_of_imu
+        self.stereo = stereo
+        self.get_imu_t = get_imu_t
         
         self.normalize = normalize
         
@@ -330,37 +339,6 @@ class mavDatasetVIO(mavDatasetCNN_3D):
             self.lst_imu += lst_imu
             self.lst_t += lst_t
     
-    def get_mat_of_imgs(self, pair1, pair2):
-        
-        path_to_img1, path_to_img2 = pair1
-        # path_to_img3, path_to_img4 = pair2
-
-        img1, img2 = read_image(path_to_img1), read_image(path_to_img2)
-        # img3, img4 = read_image(path_to_img3), read_image(path_to_img4)
-        
-        if img1.shape[0] == 1:
-            img1 = img1.repeat(3, 1, 1)
-        if img2.shape[0] == 1:
-            img2 = img2.repeat(3, 1, 1)
-        # if img3.shape[0] == 1:
-        #     img3 = img3.repeat(3, 1, 1)
-        # if img4.shape[0] == 1:
-        #     img4 = img4.repeat(3, 1, 1)
-        
-        img1 = img1.float() / 255.0
-        img2 = img2.float() / 255.0
-        # img3 = img3.float() / 255.0
-        # img4 = img4.float() / 255.0
-        
-        
-        x = None
-        if self.transform:
-            img1, img2 = self.transform(img1), self.transform(img2)
-            # img3, img4 = self.transform(img3), self.transform(img4)
-            x = torch.concat((img1, img2))
-        
-        return x
-    
     def __getitem__(self, item):
 
         pair1 = self.lst_x1[item]
@@ -369,12 +347,15 @@ class mavDatasetVIO(mavDatasetCNN_3D):
         
         # Вытаскиваем инерциалку
         imu = self.lst_imu[item]
-        imu_t = self.lst_t[item]
 
         # Получаем координаты
         y, T_m = self.lst_target[item]
+        
+        if self.get_imu_t:
+            imu_t = self.lst_t[item]
+            return x, imu, imu_t, y, T_m
     
-        return x, imu, imu_t, y, T_m
+        return x, imu, y, T_m
     
 
 class SequenceDataset(data.Dataset):
@@ -449,18 +430,24 @@ class SequenceDatasetIMU(SequenceDataset):
         
         for idx in range(start_idx, start_idx + self.seq):
             
-            x, imu, imu_t, y, T_m = self.dataset[idx]
+            if self.dataset.get_imu_t:
+                x, imu, imu_t, y, T_m = self.dataset[idx]
+                imu_t_s.append(imu_t)
+            else:
+                x, imu, y, T_m = self.dataset[idx]
         
             xs.append(x)
             ys.append(y)
             imu_s.append(imu)
-            imu_t_s.append(imu_t)
             Ts.append(T_m)
         
         x_seq = torch.stack(xs, dim=0)
         imu_seq = torch.stack(imu_s, dim=0)
-        imu_t_seq = torch.stack(imu_t_s, dim=0)
         y_seq = torch.stack(ys, dim=0)
         T_seq = torch.stack(Ts, dim=0)
+        
+        if self.dataset.get_imu_t:
+            imu_t_seq = torch.stack(imu_t_s, dim=0)
+            return x_seq, imu_seq, imu_t_seq, y_seq, T_seq
 
-        return x_seq, imu_seq, imu_t_seq, y_seq, T_seq
+        return x_seq, imu_seq, y_seq, T_seq
