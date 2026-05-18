@@ -1,14 +1,141 @@
+from pathlib import Path
+import sys
+from typing import Optional
+from types import SimpleNamespace
+
 import torch
 import torch.nn as nn
 import torchvision.models as models
 
+
+CURRENT_FILE = Path(__file__).resolve()
+PROJECT_ROOT = CURRENT_FILE.parents[4]
+WORKSPACE_ROOT = PROJECT_ROOT.parent
+FLOWNET_ROOT = WORKSPACE_ROOT / 'flownet2-pytorch'
+sys.path.append(str(FLOWNET_ROOT))
+
+PROJECT_ROOT = Path.cwd()
+FLOWNET_ROOT = PROJECT_ROOT.parent / 'flownet2-pytorch'
+
+if not FLOWNET_ROOT.exists():
+    raise FileNotFoundError(f'Не найден репозиторий FlowNet2: {FLOWNET_ROOT}')
+
+# Проверяем, что есть нужный файл.
+if not (FLOWNET_ROOT / 'networks' / 'FlowNetS.py').exists():
+    raise FileNotFoundError(f"Не найден FlowNetS.py в: {FLOWNET_ROOT / 'networks'}")
+
+sys.path.append(str(FLOWNET_ROOT))
+
+from networks.FlowNetS import FlowNetS
+
+class VisualEncoder(nn.Module):
+    
+    def __init__(self, checkpoint_path: Optional[str] = None, out_dim: int = 1024, freeze: bool = True, batch_norm: bool = False):
+        '''
+        энкодер ViNet на базе модели NVIDIA FlowNetS
+        '''
+        
+        super().__init__()
+        
+        
+        self.out_dim = out_dim
+        args = SimpleNamespace()
+        
+        self.flownets = FlowNetS(
+            args=args,
+            input_channels=6,
+            batchNorm=batch_norm
+        )
+        
+        if checkpoint_path is not None:
+            self._load_pretrained_weights(checkpoint_path)
+            
+        self.pool = nn.AdaptiveAvgPool2d((1, 1)) # (B, 1024, H, W) -> (B, 1024)
+        self.fc = nn.Linear(1024, self.out_dim)
+        
+        if freeze:
+            for param in self.flownets.parameters():
+                param.requires_grad = False
+    
+    def _load_pretrained_weights(self, checkpoint_path: str) -> None:
+        '''
+        Загружает веса из NVIDIA checkpoint.
+        '''
+
+        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        state_dict = checkpoint.get('state_dict', checkpoint)
+        cleaned_state_dict = {}
+
+        for key, value in state_dict.items():
+            new_key = key.replace('module.', '')
+            new_key = new_key.replace('flownets.', '')
+            cleaned_state_dict[new_key] = value
+
+        missing, unexpected = self.flownets.load_state_dict(
+            cleaned_state_dict,
+            strict=False
+        )
+
+        print(f'[FlowNet2SEncoder] Missing keys: {len(missing)}')
+        print(f'[FlowNet2SEncoder] Unexpected keys: {len(unexpected)}')
+
+    
+    def _normalize_like_flownet(self, x: torch.Tensor) -> torch.Tensor:
+        '''
+        Нормализация в стиле FlowNet2S.
+
+        NVIDIA FlowNet2S обычно работает с изображениями в диапазоне примерно [0, 255]
+        '''
+        
+        if x.max() <= 2.0:
+            x = x * 255.0
+
+        # Считаем среднее отдельно для каждого элемента батча и канала 
+        rgb_mean = x.contiguous().view(x.size(0), x.size(1), -1).mean(dim=-1)
+        rgb_mean = rgb_mean.view(x.size(0), x.size(1), 1, 1)
+
+        
+        x = (x - rgb_mean) / 255.0 # Центрируем и масштабируем
+
+        return x
+    
+    
+    def forward(self, x: torch.Tensor):
+        '''
+        (B, 12, H, W)
+        '''
+        
+        if x.ndim != 4:
+            raise ValueError(f"x должен иметь форму (B, 12, H, W), а получил {x.shape}")
+
+        if x.shape[1] != 6:
+            raise ValueError(f"x должен иметь 12 каналов, а получил {x.shape[1]}")
+
+        x = self._normalize_like_flownet(x) # Нормализуем вход в соответствии с ожиданиями FlowNetS
+
+        out_conv1 = self.flownets.conv1(x)
+        out_conv2 = self.flownets.conv2(out_conv1)
+        out_conv3 = self.flownets.conv3_1(self.flownets.conv3(out_conv2))
+        out_conv4 = self.flownets.conv4_1(self.flownets.conv4(out_conv3))
+        out_conv5 = self.flownets.conv5_1(self.flownets.conv5(out_conv4))
+        out_conv6 = self.flownets.conv6_1(self.flownets.conv6(out_conv5))
+
+        feat = self.pool(out_conv6) # (B, 1024, h, w) 
+        feat = feat.flatten(start_dim=1) # (B, 1024, 1, 1) -> (B, 1024)
+        feat = self.fc(feat) # (B, visual_dim)
+
+        return feat
+
+
 class DeepVO(nn.Module):
-    def __init__(self, feat_dim=1024, hidden_size=1000, num_layers=2, dropout=0.3):
+    def __init__(self, VisualEncoder, feat_dim=1024, hidden_size=1000, num_layers=2, dropout=0.3):
         
         '''
         RNN + FCx2 блока для возможности трансферного обучения
         '''
         super().__init__()
+        
+        self.VisualEncoder = VisualEncoder
         
         self.rnn = nn.LSTM(
             input_size=feat_dim,
@@ -30,45 +157,29 @@ class DeepVO(nn.Module):
             nn.Linear(256, 3)
         )
         
-    def forward(self, x, hidden):
+    def forward(self, x_seq: torch.Tensor, hidden=None):
         
-        rnn_out, hidden = self.rnn(x, hidden) 
-    
+        if x_seq.ndim != 5:
+            raise ValueError(f"x_seq должен иметь форму (B, S, 12, H, W), а получил {x_seq.shape}")
+        
+        B, S, C, H, W = x_seq.shape
+        
+        fused_features = []
+
+        for t in range(S):
+            
+            x_t = x_seq[:, t]  # (B, 12, H, W)
+
+            visual_feat = self.VisualEncoder(x_t)  # (B, visual_dim)
+            
+            fused_features.append(visual_feat)
+        
+        fused_seq = torch.stack(fused_features, dim=1) # Собираем последовательность признаков
+        rnn_out, hidden = self.rnn(fused_seq, hidden) # Прогоняем последовательность через основную RNN
+
         p, r = self.fc1(rnn_out), self.fc2(rnn_out) # (B, S, 3)
-        return torch.cat([p, r], dim=-1), hidden
-        
- 
-class DeepVO_CNN(nn.Module):
-    
-    def __init__(self, encoder, feat_dim=1024, hidden_size=1000, num_layers=2, dropout=0.3):
-        '''
-        ecnoder: Модель свертки, архитектура, которой должна иметь в себе слой "encoder"
-        '''
-        super().__init__()
+        return torch.cat([p, r], dim=-1).to(dtype=torch.float64), hidden
 
-        self.encoder = encoder
-        
-        self.head = DeepVO(feat_dim, hidden_size, num_layers, dropout)
-        
-    def forward(self, x, hidden=None):
-        
-        if x.ndim != 5:
-            raise ValueError(f"x должен иметь форму (S, S, C, H, W), а имеет {x.shape}")
-        
-        S = x.shape[1] # берем длину последовательности
-        features = []
-        
-        for s in range(S):
-            x_s = x[:, s] # (B, C, H, W)
-            feat_s = self.encoder(x_s)
-            features.append(feat_s)
-
-        features = torch.stack(features, dim=1) # (B, S, F)     
-          
-        y, hidden = self.head(features, hidden)
-        
-        return y.to(dtype=torch.float64), hidden
-    
     @staticmethod
     def detach_hidden(hidden):
         '''
@@ -82,59 +193,4 @@ class DeepVO_CNN(nn.Module):
         
         if isinstance(hidden, tuple): # Для LSTM
             return tuple(h.detach() for h in hidden)
-
-class DeepVO_RAFT(DeepVO_CNN):
-    
-    def __init__(self, encoder, feat_dim=128, hidden_size=256, num_layers=2, dropout=0.3):
-        super().__init__(encoder, feat_dim, hidden_size, num_layers, dropout)
-        
-    def forward(self, img1, img2, hidden=None):
-        
-        if img1.ndim != 5:
-            raise ValueError(f"img1 должен иметь форму (S, S, C, H, W), а имеет {img1.shape}")
-        
-        S = img1.shape[1] # берем длину последовательности
-        features = []
-        
-        for s in range(S):
-            img1_s = img1[:, s] # (B, C, H, W)
-            img2_s = img2[:, s]
-            feat_s = self.encoder(img1_s, img2_s)
-            features.append(feat_s.flatten(1))
-
-        features = torch.stack(features, dim=1) # (B, S, F)        
-        y, hidden = self.head(features, hidden)
-        
-        return y.to(dtype=torch.float64), hidden
-       
-class PairwiseVOModel(nn.Module): # Модель для обучения экодера. Учим его распознавать паттерны
-    def __init__(self, encoder, feet_dim=1024, pose_dim=6, dropout=0.3):
-        '''
-        Обертка для отдельного обучения энкодера, который потом будет интегрирован в DeepVO
-        '''
-        
-        
-        
-        super().__init__()
-        
-        self.encoder = encoder
-        
-        self.fc1 = nn.Sequential(
-            nn.Linear(feet_dim, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(256, 3)
-        )
-        self.fc2 = nn.Sequential(
-            nn.Linear(feet_dim, 256),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(256, 3)
-        )
-        
-    def forward(self, x):
-        x = self.encoder(x) # (B, feet_dim)
-        
-        p, r = self.head(x)
-        
-        return torch.cat([p, r], dim=-1).to(dtype=torch.float64)
+ 

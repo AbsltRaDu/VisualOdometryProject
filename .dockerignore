@@ -1,0 +1,16 @@
+.git
+
+__pycache__
+.pyc 
+.pyo 
+
+venv/
+.env/
+.venv/
+
+.vscode 
+
+datasets
+.tar
+
+.python-version

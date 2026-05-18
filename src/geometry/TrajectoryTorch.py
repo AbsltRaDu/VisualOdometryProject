@@ -196,7 +196,18 @@ class TrajectoryTorch:
         deltas = [pose0.inv() * pose1 for pose0, pose1 in  zip(self.poses[:-1], self.poses[1:])]
         
         return PoseTorch.stack(deltas, dim=-2)
+    
+    def relative_motion(self, start_index: int = 0, end_index: int = -1) -> PoseTorch:
+        '''
+        Возвращает матрицу сдвига от начальной позы к конечной
         
+        метод сугубо для метрики KITTI
+        '''
+    
+        deltas = self.poses[start_index].inv() * self.poses[end_index]
+        
+        return deltas
+    
     def path_length(self) -> torch.Tensor:
         '''
         Вычисляет суммарную длину траектории по последовательности поз
