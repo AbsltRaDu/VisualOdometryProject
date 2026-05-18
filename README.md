@@ -3,7 +3,7 @@
 Для генерации синтетики был написан отдельный проект на базе AirSim Microsoft: https://github.com/AbsltRaDu/AirSimDatasetCreator<br>
 
 <head>Логика формирования батчей</head>
-<img width="974" height="325" alt="изображение" src="https://github.com/user-attachments/assets/1ea77553-c729-484a-8bbd-e863009875d8" />
+<img width="1536" height="1024" alt="7f277a5c-0a32-43af-b016-a54b87f24e9d" src="https://github.com/user-attachments/assets/ece0950d-57a8-4cbe-aef4-f8276aa2dc35" />
 
 
 Модуль геометрии:
