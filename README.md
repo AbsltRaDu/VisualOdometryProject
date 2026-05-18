@@ -2,15 +2,15 @@
 Датасет outdoor: https://fpv.ifi.uzh.ch/<br>
 Для генерации синтетики был написан отдельный проект на базе AirSim Microsoft: https://github.com/AbsltRaDu/AirSimDatasetCreator<br>
 
+<head>Логика формирования батчей</head>
+<img width="974" height="325" alt="изображение" src="https://github.com/user-attachments/assets/1ea77553-c729-484a-8bbd-e863009875d8" />
+
+
 Модуль геометрии:
 ```
 src/geometry
 ```
 
-Веса сетей по пути:
-```
-process_of_fitting/fitting_models
-```
 
 Скрипты обучения:
 ```
