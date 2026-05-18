@@ -6,4 +6,6 @@ BestBaseLineResNet18.tar
 databases.tar
 .vscode
 *.tar
+__pycache__/
+*.pyc
 models_from_github

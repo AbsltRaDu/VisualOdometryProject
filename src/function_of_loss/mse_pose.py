@@ -63,13 +63,13 @@ class PoseLossTrajectory(nn.Module):
         self.a = a
         self.b = b
         
-    def forward(self, y_pred: TrajectoryTorch, y_fact: PoseTorch):
+    def forward(self, y_pred: TrajectoryTorch, y_fact: TrajectoryTorch):
         
         r_pred = y_pred.poses.R.as_quat()
         t_pred = y_pred.poses.t
         
-        r_fact = y_fact.R.as_quat()
-        t_fact = y_fact.t
+        r_fact = y_fact.poses.R.as_quat()
+        t_fact = y_fact.poses.t
         
         self.r_loss = self.mse(r_pred, r_fact)
         self.t_loss = self.mse(t_pred, t_fact)
@@ -107,4 +107,20 @@ class PoseLossTrajectorySeq(PoseLossTrajectory):
         
         return self.a * self.r_loss + self.b * self.t_loss
 
-     
+class RelativeMotionError(nn.Module):
+    
+    def __init__(self, a: float = 100, b: float = 1):
+        super().__init__()
+        
+        self.a = a
+        self.b = b
+        
+    def forward(self, y_pred: PoseTorch, y_fact: PoseTorch):
+        
+        motion_error = y_fact.inv() * y_pred
+
+        return motion_error
+        
+        
+
+    
