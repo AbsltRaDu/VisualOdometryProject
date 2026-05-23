@@ -220,7 +220,7 @@ class PureINSModel(torch.nn.Module):
         # Интегрируем последовательность IMU
         pose, velocity, states = self.propagator.propagate_sequence(pose=init_pose, velocity=init_velocity, gyro=gyro, accel=accel, dt=dt, return_all=return_all)
 
-        # Возвращаем словарь, чтобы потом было удобно расширять модель.
+
         return pose, velocity, states
     
 

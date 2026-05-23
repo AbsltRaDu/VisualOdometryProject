@@ -26,7 +26,28 @@ class PoseLoss(nn.Module):
         self.r_loss = self.mse(pred_eul, fact_eul)
         
         return self.pos_loss + self.k * self.r_loss
+
+class PoseLossEuler(PoseLoss):
     
+    def forward(self, y_pred: torch.Tensor, y_fact: torch.Tensor):
+        
+        pred_p = y_pred[..., 3:].flatten()
+        pred_eul = y_pred[..., :3].flatten()
+        
+        fact_p = y_fact[..., 3:].flatten()
+        fact_eul = y_fact[..., :3].flatten()
+        
+        print("y_pred.shape:", y_pred.shape)
+        print("y_fact.shape:", y_fact.shape)
+        print("y_pred dtype:", y_pred.dtype)
+        print("y_fact dtype:", y_fact.dtype)
+        
+        self.pos_loss = self.mse(pred_p, fact_p)
+        self.r_loss = self.mse(pred_eul, fact_eul)
+        
+        return self.pos_loss + self.k * self.r_loss
+    
+
 class PoseLoseSeq(PoseLoss):
     '''
     Ошибка покадровая по последовательности
@@ -76,6 +97,8 @@ class PoseLossTrajectory(nn.Module):
         
         return self.a * self.r_loss + self.b * self.t_loss
     
+
+    
 class PoseLossTrajectorySeq(PoseLossTrajectory):
     '''
     Ошибка по конечной позе по последовательностям
@@ -92,7 +115,7 @@ class PoseLossTrajectorySeq(PoseLossTrajectory):
         if not isinstance(y_fact, TrajectoryTorch):
             raise TypeError('y_fact должен быть объектом PoseTorch')
         
-        if y_pred.poses.t.ndim < 3 and y_fact.t.ndim < 3:
+        if y_pred.poses.t.ndim < 3 and y_fact.poses.t.ndim < 3:
             raise ValueError('Последовательности должны иметь формат (N, seq, 6)')
         
         
@@ -123,4 +146,41 @@ class RelativeMotionError(nn.Module):
         
         
 
-    
+class WeightedMSELoss(nn.Module):
+    """
+    Computes a weighted MSE loss for angle and translation components.
+
+    Args:
+        window_size (int): Used to reshape tensors for weighted loss calculation.
+        alpha (float, optional): Weight for the angle loss component.
+    """
+
+    def __init__(
+        self,
+        window_size: int=2,
+        alpha: float=1,
+    ):
+        super(WeightedMSELoss, self).__init__()
+        self.window_size = window_size
+        self.alpha = float(alpha)
+        self.mse_loss = nn.MSELoss()
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        # Separate angles and translation for ground truth
+        y_true = torch.reshape(y_true, (y_true.shape[0], self.window_size - 1, 6))
+        gt_angles = y_true[:, :, :3].flatten()
+        gt_translation = y_true[:, :, 3:].flatten()
+
+        # Separate angles and translation for predicted
+        y_pred = torch.reshape(y_pred, (y_pred.shape[0], self.window_size - 1, 6))
+        estimated_angles = y_pred[:, :, :3].flatten()
+        estimated_translation = y_pred[:, :, 3:].flatten()
+
+        # Calculate weighted losses for angles and translation
+        loss_angles = self.mse_loss(estimated_angles, gt_angles)
+        loss_translation = self.mse_loss(estimated_translation, gt_translation)
+
+        # Compute final weighted loss
+        loss = loss_translation + self.alpha * loss_angles
+
+        return loss

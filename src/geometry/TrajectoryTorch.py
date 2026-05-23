@@ -44,7 +44,13 @@ class TrajectoryTorch:
         '''
         
         return cls(PoseTorch.from_lie(poses))
+
+    @classmethod
+    def from_euler_absolute(cls, poses: torch.Tensor) -> 'TrajectoryTorch':
         
+        
+        return cls(PoseTorch.from_euler(poses))
+    
     @classmethod
     def from_relative(cls, deltas: PoseTorch, pose0: Optional[PoseTorch] = None) -> 'TrajectoryTorch':
         '''
@@ -113,6 +119,11 @@ class TrajectoryTorch:
         deltas = PoseTorch.from_lie(xi_seq)
         return cls.from_relative(deltas, pose0)
     
+    @classmethod
+    def from_euler_relative(cls, x: torch.Tensor, pose0: Optional[PoseTorch] = None) -> 'TrajectoryTorch':
+    
+        deltas = PoseTorch.from_euler(x)
+        return cls.from_relative(deltas, pose0)
     
     
     def extend_relative(self, deltas: PoseTorch, keep_history: bool = True) -> 'TrajectoryTorch':
@@ -149,6 +160,12 @@ class TrajectoryTorch:
         
         deltas = PoseTorch.from_lie(xi_seq)
         
+        return self.extend_relative(deltas, keep_history)
+    
+    def extend_euler_relative(self, x: torch.Tensor, keep_history: bool = True) -> 'TrajectoryTorch':
+
+        
+        deltas = PoseTorch.from_euler(x)
         return self.extend_relative(deltas, keep_history)
     
     def as_pose(self) -> PoseTorch:

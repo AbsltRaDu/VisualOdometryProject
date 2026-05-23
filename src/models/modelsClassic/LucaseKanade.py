@@ -306,10 +306,6 @@ class LKOpticalFlowVO(nn.Module):
                         ], dtype=pose_pred.dtype, device=pose_pred.device)
         pose_pred = pose_pred.change_basis(C)
         
-        
-        print("PnP raw tvec:", tvec.squeeze())
-        print("PnP after inv t:", pose_pred.t)
-        
         y_pred = pose_pred.as_lie()
 
         debug["success"] = True

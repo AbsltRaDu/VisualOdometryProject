@@ -4,6 +4,7 @@ import torch
 from torchvision import transforms as T
 
 from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
+from src.dataloaders.datasets_KITTI import kittiDataset_3D
 from src.models.modelsNN.pairwaisNN.CNN_ResNet18_VO import CNN_ResNet18_VO
 from src.piplines.SimulationPipline import SimulationCNN
 
@@ -20,11 +21,24 @@ transform = T.Compose([
 
 normalize = None
 
-lst_of_dataset = os.listdir('datasets/simulation')
-lst_of_dataset_test = ['mav_square']
+# lst_of_dataset = os.listdir('datasets/simulation')
+# lst_of_dataset_test = ['mav_square']
 
-dataset = mavDatasetCNN_3D(
-    'datasets/simulation', 
+# dataset = mavDatasetCNN_3D(
+#     'datasets/simulation', 
+#     transform,
+#     normalize=normalize,
+#     device='cpu',
+#     lst_of_datasets=lst_of_dataset_test,
+#     stereo=True
+#     )
+
+lst_of_dataset = [i for i in os.listdir('datasets/sequences') if i != 'poses']
+lst_of_dataset_test = lst_of_dataset[0]
+
+dataset = kittiDataset_3D(
+    'datasets/sequences',
+    'datasets/sequences/poses',
     transform,
     normalize=normalize,
     device='cpu',
@@ -36,7 +50,7 @@ dtrain = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')
 
 model = CNN_ResNet18_VO()
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet18.tar', map_location=device)
+state_dict_cnn = torch.load('process_of_fitting/fitting_models/CNNResNet18_KITTI.tar', map_location=device)
 model.load_state_dict(state_dict_cnn)
 model = model.to(device)
 

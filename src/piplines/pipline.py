@@ -10,7 +10,7 @@ from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
 
 from src.function_of_loss.mse_pose import PoseLossTrajectory, PoseLoss
-from src.piplines.trainObject import CNNTrainerStep, RNNTrainerStep, RNNIMUTrainerStep
+from src.piplines.trainObject import CNNTrainerStep, RNNTrainerStep, RNNIMUTrainerStep, DeepVOTrainerStep
 
 class TrainerCNN:
     
@@ -118,9 +118,11 @@ class TrainerCNN:
             train.get_localLoss(self.lm_count)
             
             predict = train.predict
+            y_train = train.y_train
             if self.normalize:
                 predict = self.normalize.denormalize(predict)
-            train.take_predict_after_norm(predict)
+                y_train = self.normalize.denormalize(y_train)
+            train.take_predict_after_norm(predict, y_train)
             
             self.lm_count_trajectory += 1
             train.get_globalLossMetrice(self.lm_count_trajectory) # Считаю метрику глобальной траектории
@@ -166,9 +168,11 @@ class TrainerCNN:
                 test.get_localLoss(self.lm_count)
                 
                 predict = test.predict
+                y_train = test.y_train
                 if self.normalize:
                     predict = self.normalize.denormalize(predict)
-                test.take_predict_after_norm(predict)
+                    y_train = self.normalize.denormalize(y_train)
+                test.take_predict_after_norm(predict, y_train)
 
                 self.lm_count_trajectory += 1
                 test.get_globalLossMetrice(self.lm_count_trajectory)
@@ -255,6 +259,30 @@ class TrainerRNN(TrainerCNN):
         )
 
         return train 
+    
+class TrainerDeepVO(TrainerCNN):
+    
+    def init_trainObject(self):
+        '''
+        Инициализирует объект класса TrainObject
+        
+        По сути просто обертка, чтобы можно было менять в классе только
+        класс TrainObject в зависимости от задачи
+        '''
+        train = DeepVOTrainerStep(
+            model=self.model,
+            hidden=None, 
+            pred_pose0=None,
+            localLoss=self.loss_func_pose,
+            globalLoss=self.loss_func_trajectory,
+            optimizer=self.optimizer,
+            weight_pose=self.weight_pose,
+            weight_trajectory=self.weight_trajectory,
+            window_size=self.window_size,
+            device=self.device
+        )
+
+        return train 
 
 class TrainerRNNIMU(TrainerRNN):
     
@@ -280,4 +308,54 @@ class TrainerRNNIMU(TrainerRNN):
 
         return train 
     
+# БЛОК 2D
+
+from src.piplines.trainObject import CNNTrainerStep2D, RNNTrainerStep2D
+
+class TrainerCNN2D(TrainerCNN):
     
+    def init_trainObject(self):
+        '''
+        Инициализирует объект класса TrainObject
+        
+        По сути просто обертка, чтобы можно было менять в классе только
+        класс TrainObject в зависимости от задачи
+        '''
+        train = CNNTrainerStep2D(
+            model=self.model,
+            hidden=None, 
+            pred_pose0=None,
+            localLoss=self.loss_func_pose,
+            globalLoss=self.loss_func_trajectory,
+            optimizer=self.optimizer,
+            weight_pose=self.weight_pose,
+            weight_trajectory=self.weight_trajectory,
+            window_size=self.window_size,
+            device=self.device
+        )
+
+        return train    
+    
+class TrainerRNN2D(TrainerCNN2D):
+    
+    def init_trainObject(self):
+        '''
+        Инициализирует объект класса TrainObject
+        
+        По сути просто обертка, чтобы можно было менять в классе только
+        класс TrainObject в зависимости от задачи
+        '''
+        train = RNNTrainerStep2D(
+            model=self.model,
+            hidden=None, 
+            pred_pose0=None,
+            localLoss=self.loss_func_pose,
+            globalLoss=self.loss_func_trajectory,
+            optimizer=self.optimizer,
+            weight_pose=self.weight_pose,
+            weight_trajectory=self.weight_trajectory,
+            window_size=self.window_size,
+            device=self.device
+        )
+
+        return train 

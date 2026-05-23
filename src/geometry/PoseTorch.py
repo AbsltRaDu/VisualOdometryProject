@@ -47,6 +47,19 @@ class PoseTorch:
         
         return cls(R, t)
     
+    @classmethod
+    def from_euler(cls, vec: torch.Tensor, seq='XYZ'):
+        '''
+        Создание позы из матрицы движения 4 на 4
+        '''
+        
+        euler = vec[..., :3]
+        t = vec[..., 3:]
+        
+        R = RotationTorch.from_euler(euler, seq)
+        
+        return cls(R, t)
+    
     @staticmethod
     def se3_to_pytorch3d(T: torch.Tensor) -> torch.Tensor:
         '''
@@ -135,6 +148,15 @@ class PoseTorch:
         xi = xi_flat.reshape(*batch_shape, 6)
         
         return xi
+    
+    def as_euler(self, seq='XYZ'):
+        
+        R_euler = self.R.as_euler(seq=seq)
+        t = self.t
+        
+        pose = torch.cat([t, R_euler], dim=-1)
+        
+        return pose
     
     def rotation(self) -> RotationTorch:
         '''
