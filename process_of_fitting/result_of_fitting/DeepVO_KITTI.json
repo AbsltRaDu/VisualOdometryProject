@@ -1,0 +1,35 @@
+{
+    "epoch": [
+        0
+    ],
+    "loss_train": [
+        0.49049158012404453
+    ],
+    "loss_test": [
+        0.20921309411649894
+    ],
+    "loss_pose_train": [
+        0.49049158012404453
+    ],
+    "loss_pose_test": [
+        0.20921309411649894
+    ],
+    "loss_trajectory_train": [
+        31053.780485368028
+    ],
+    "loss_trajectory_test": [
+        470.5524265994497
+    ],
+    "loss_trajectory_train_gl": [
+        4671.515041691957
+    ],
+    "loss_trajectory_test_gl": [
+        1409.7594346352043
+    ],
+    "Average Translational RMSE drift": [
+        5.465161227688784
+    ],
+    "Average Rotational RMSE drift": [
+        0.07812655603725271
+    ]
+}

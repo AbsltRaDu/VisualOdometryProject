@@ -9,3 +9,4 @@ databases.tar
 __pycache__/
 *.pyc
 models_from_github
+*.pth

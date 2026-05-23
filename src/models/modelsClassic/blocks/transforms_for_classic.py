@@ -17,13 +17,15 @@ class TorchImageToCvGray:
         
         img = img.detach().cpu() # Перегнали изображение на цп
         
-        img = img.permute(1, 2, 0).numpy()
+        # img = img.permute(1, 2, 0)
         
-        img = (img * 255.0).clip(0, 255).astype(np.uint8)
+        img = (img * 255.0).clip(0, 255).to(dtype=torch.uint8)
         
-        if img.shape[2] == 3:
-            img_graay = img[:, :, 0]
+        
+        
+        if img.shape[0] == 3:
+            img_graay = img[0, :, :].unsqueeze(0)
         else:
-            raise ValueError(f'Неожиданное число каналов: {img.shape[2]}')
+            raise ValueError(f'Неожиданное число каналов: {img.shape[0]}')
         
         return img_graay

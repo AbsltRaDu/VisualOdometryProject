@@ -3,9 +3,11 @@ import os
 import torch
 from torchvision import transforms as T
 
-from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
-from src.models.modelsNN.DeepVO import DeepVO, VisualEncoder
-from src.piplines.SimulationPipline import SimulationRNN
+from src.dataloaders.datasets2D import mavDatasetCNN_2D
+from src.piplines.SimulationPipline import SimulationClassic2D
+from src.models.modelsClassic.LucaseKanade import LKOpticalFlowVO2D2
+from src.models.modelsClassic.blocks.transforms_for_classic import TorchImageToCvGray
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if torch.cuda.is_available():
@@ -14,35 +16,30 @@ else:
     print('Обучение на', device, sep=' ')
     
 transform = T.Compose([
-    T.Resize((224, 224)),
-    T.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    TorchImageToCvGray()
 ])
 
 normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
-lst_of_dataset_test = ['mav_square']
+lst_of_dataset_test = ['al']
 
-dataset = mavDatasetCNN_3D(
+dataset = mavDatasetCNN_2D(
     'datasets/simulation', 
     transform,
     normalize=normalize,
     device='cpu',
     lst_of_datasets=lst_of_dataset_test,
-    stereo=False
+    stereo=True
     )
 
 dtrain = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')
 
-encoder = VisualEncoder()
-model = DeepVO(VisualEncoder=encoder)
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/DeepVO_AirSim.tar', map_location=device)
-model.load_state_dict(state_dict_cnn)
-model = model.to(device)
-
 dtrain = iter(dtrain)
 
-simulation = SimulationRNN(model=model, device=device, dtrain=dtrain, norm=normalize)
+model = LKOpticalFlowVO2D2(width=752, height=480, new_width=752, new_height=480, fov_deg=90, baseline=0.2)
+
+simulation = SimulationClassic2D(model=model, device='cpu', dtrain=dtrain, norm=normalize, visualization=True)
 simulation()
 simulation.get_pictures()

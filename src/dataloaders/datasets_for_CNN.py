@@ -152,6 +152,7 @@ class mavDatasetCNN_3D(data.Dataset):
             img1, img2 = self.transform(img1), self.transform(img2)
             if self.stereo:
                 img3, img4 = self.transform(img3), self.transform(img4)
+                
                 x = torch.concat((img1, img3, img2, img4))
             else:
                 x = torch.concat((img1, img2))
@@ -184,7 +185,25 @@ class mavDatasetCNN_3D(data.Dataset):
     
     def __len__(self):
         return self.length
-
+    
+class mavDatasetCNN_3D_euler(mavDatasetCNN_3D):
+    
+        # Ф-ия вызова матрицы смещения и начальной позы
+    def get_delta_quat(self, q1: torch.Tensor, q2: torch.Tensor, p1: torch.Tensor, p2: torch.Tensor): # Ф-ия поиска определения углой эйлера из кватерионов + определение прирощения позы
+        
+        pose1 = PT.from_rt(RT.from_quat(q1), p1)
+        pose2 = PT.from_rt(RT.from_quat(q2), p2)
+        
+        delta_pose = pose1.inv() * pose2
+        delta_pose = delta_pose.as_euler()
+        
+        if self.normalize is not None:
+            delta_pose = self.normalize.normalize(delta_pose)
+        
+        return delta_pose, pose1.as_euler()
+    
+    
+    
 class mavDatasetVIO(mavDatasetCNN_3D):
     
     def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None, num_of_imu=10, get_imu_t: bool = False):
