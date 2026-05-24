@@ -37,56 +37,37 @@ class LKOpticalFlowVO(nn.Module):
         min_pnp_inliers: int = 10,
         return_debug: bool = False,
     ):
-        """
-        width, height:
-            исходный размер изображения камеры до resize.
+        '''
+        width, height: исходный размер изображения камеры до resize.
 
-        new_width, new_height:
-            размер изображения после resize, который реально приходит в модель.
+        new_width, new_height: размер изображения после resize, который реально приходит в модель.
 
-        fov_deg:
-            горизонтальный угол обзора камеры в градусах.
+        fov_deg: горизонтальный угол обзора камеры в градусах.
 
-        baseline:
-            расстояние между камерами в метрах.
+        baseline: расстояние между камерами в метрах.
 
-        max_corners:
-            максимальное число точек, которые ищем на left_t.
+        max_corners: максимальное число точек, которые ищем на left_t.
 
-        quality_level:
-            порог качества углов для cv2.goodFeaturesToTrack.
-            Меньше значение -> больше точек, но больше шума.
+        quality_level: порог качества углов для cv2.goodFeaturesToTrack. Меньше значение -> больше точек, но больше шума.
 
-        min_distance:
-            минимальная дистанция между найденными точками в пикселях.
+        min_distance: минимальная дистанция между найденными точками в пикселях.
 
-        block_size:
-            размер окна для оценки качества углов.
+        block_size: размер окна для оценки качества углов.
 
-        lk_win_size:
-            размер окна Lucas–Kanade optical flow.
+        lk_win_size: размер окна Lucas–Kanade optical flow.
 
-        lk_max_level:
-            число уровней пирамиды LK.
-            Больше -> лучше отслеживание больших смещений, но медленнее.
+        lk_max_level: число уровней пирамиды LK. Больше -> лучше отслеживание больших смещений, но медленнее.
 
-        lk_max_error:
-            максимальная ошибка LK по status/error.
+        lk_max_error:максимальная ошибка LK по status/error.
 
-        fb_max_error:
-            forward-backward check.
-            Точка отслеживается t -> t+1, потом обратно t+1 -> t.
-            Если вернулась далеко от исходной, точку выбрасываем.
+        fb_max_error: forward-backward check. Точка отслеживается t -> t+1, потом обратно t+1 -> t.
 
-        min_depth, max_depth:
-            допустимый диапазон глубины.
+        min_depth, max_depth: допустимый диапазон глубины.
 
-        min_pnp_points:
-            минимум 3D->2D соответствий перед PnP.
+        min_pnp_points: минимум 3D->2D соответствий перед PnP.
 
-        min_pnp_inliers:
-            минимум inliers после PnP RANSAC.
-        """
+        min_pnp_inliers: минимум inliers после PnP RANSAC.
+        '''
         super().__init__()
 
         self.width = width
@@ -112,34 +93,17 @@ class LKOpticalFlowVO(nn.Module):
         self.min_pnp_inliers = min_pnp_inliers
         self.return_debug = return_debug
 
-        self.triangulation = TriangulationMod(
-            self.width,
-            self.height,
-            self.new_width,
-            self.new_height,
-            self.fov_deg,
-            self.baseline,
-        )
+        self.triangulation = TriangulationMod(self.width,self.height,self.new_width,self.new_height,self.fov_deg,self.baseline)
 
         block = 7
-        self.stereo = cv2.StereoSGBM_create(
-            minDisparity=0,
-            numDisparities=16 * 6,
-            blockSize=block,
-            P1=8 * 1 * block ** 2,
-            P2=32 * 1 * block ** 2,
-            disp12MaxDiff=1,
-            uniquenessRatio=10,
-            speckleWindowSize=100,
-            speckleRange=2,
-            preFilterCap=63,
-            mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY,
-        )
+        self.stereo = cv2.StereoSGBM_create(minDisparity=0, numDisparities=16 * 6, blockSize=block, P1=8 * 1 * block ** 2,
+            P2=32 * 1 * block ** 2, disp12MaxDiff=1, uniquenessRatio=10, speckleWindowSize=100, speckleRange=2,
+            preFilterCap=63, mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY)
 
     def _zero_prediction(self, reason: str, debug: Optional[dict] = None):
-        """
+        '''
         Возвращает нулевое движение, если pipeline не смог оценить позу.
-        """
+        '''
         if debug is None:
             debug = {}
 
@@ -159,9 +123,9 @@ class LKOpticalFlowVO(nn.Module):
         return y_pred
 
     def _detect_points(self, img_left_1: np.ndarray):
-        """
+        '''
         Используем cv2.goodFeaturesToTrack детектор углов Shi–Tomasi
-        """
+        '''
         pts = cv2.goodFeaturesToTrack(
             image=img_left_1,
             maxCorners=self.max_corners,
@@ -170,13 +134,12 @@ class LKOpticalFlowVO(nn.Module):
             blockSize=self.block_size,
         )
 
-        # OpenCV возвращает форму (N, 1, 2), если точки найдены.
         return pts
 
     def _track_lk(self, img_left_1: np.ndarray, img_left_2: np.ndarray, pts_1: np.ndarray):
-        """
+        '''
         Отслеживает точки pts_1 из left_t в left_t+1 через Lucas–Kanade.
-        """
+        '''
         lk_params = dict(
             winSize=self.lk_win_size,
             maxLevel=self.lk_max_level,
@@ -230,9 +193,9 @@ class LKOpticalFlowVO(nn.Module):
         return p1[valid], p2[valid], valid
 
     def _depth_from_sgbm(self, img_left_1: np.ndarray, img_right_1: np.ndarray):
-        """
+        '''
         Строит disparity/depth map через StereoSGBM.
-        """
+        '''
         disp_raw = self.stereo.compute(img_left_1, img_right_1)
         disparity = disp_raw.astype(np.float32) / 16.0
 
@@ -252,9 +215,9 @@ class LKOpticalFlowVO(nn.Module):
         return depth, disparity, valid_depth
 
     def _build_3d_2d_correspondences(self, pts_1: np.ndarray, pts_2: np.ndarray, depth: np.ndarray):
-        """
+        '''
         Собирает пары 3D_t и 2D_t+1.
-        """
+        '''
         object_points = []
         image_points = []
 
@@ -290,9 +253,9 @@ class LKOpticalFlowVO(nn.Module):
         return object_points, image_points
 
     def _return_torch_result(self, rvec, tvec, debug):
-        """
-        Конвертирует OpenCV PnP результат в Lie-вектор проекта.
-        """
+        '''
+        Конвертирует OpenCV PnP результат в Ли-вектор.
+        '''
         rvec_pred = torch.from_numpy(rvec.squeeze()).to(dtype=torch.float64)
         tvec_pred = torch.from_numpy(tvec.squeeze()).to(dtype=torch.float64)
 
@@ -314,9 +277,9 @@ class LKOpticalFlowVO(nn.Module):
         return y_pred, debug
 
     def forward(self, img_left_1: np.ndarray, img_right_1: np.ndarray, img_left_2: np.ndarray):
-        """
+        '''
         Основной forward.
-        """
+        '''
         with torch.no_grad():
             debug = {
                 "success": False,
@@ -328,11 +291,11 @@ class LKOpticalFlowVO(nn.Module):
                 "num_pnp_inliers": 0,
             }
 
-            # 1. Считаем dense depth map из stereo-пары t.
+            # Считаем dense depth map из stereo-пары t.
             depth, disparity, valid_depth = self._depth_from_sgbm(img_left_1, img_right_1)
             debug["num_depth_valid_pixels"] = int(valid_depth.sum())
 
-            # 2. Ищем точки на left_t для LK tracking.
+            # Ищем точки на left_t для LK tracking.
             pts_1_raw = self._detect_points(img_left_1)
 
             if pts_1_raw is None or len(pts_1_raw) == 0:
@@ -340,7 +303,7 @@ class LKOpticalFlowVO(nn.Module):
 
             debug["num_detected_points"] = int(len(pts_1_raw))
 
-            # 3. Отслеживаем точки left_t -> left_t+1.
+            # Отслеживаем точки left_t -> left_t+1.
             pts_1, pts_2, valid_lk = self._track_lk(img_left_1, img_left_2, pts_1_raw)
 
             if pts_1 is None or pts_2 is None:
@@ -351,7 +314,7 @@ class LKOpticalFlowVO(nn.Module):
             if len(pts_1) < self.min_pnp_points:
                 return self._zero_prediction("not_enough_lk_tracks", debug)
 
-            # 4. Собираем 3D_t -> 2D_t+1 соответствия.
+            # Собираем 3D_t -> 2D_t+1 соответствия.
             object_points, image_points = self._build_3d_2d_correspondences(
                 pts_1,
                 pts_2,

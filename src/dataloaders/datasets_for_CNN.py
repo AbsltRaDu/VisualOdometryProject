@@ -100,11 +100,24 @@ class mavDatasetCNN_3D(data.Dataset):
         
             targets, dct_of_timestamp_cam0, dct_of_timestamp_cam1 = self._get_data_from_path(path_local)
             
-            keys = sorted(targets.keys())
-            func_of_key = lambda x, y: x if x in y else min(y, key=lambda k: (abs(k - x), k))
+            # keys = sorted(targets.keys())
+            # func_of_key = lambda x, y: x if x in y else min(y, key=lambda k: (abs(k - x), k))
             
-            lst_cam0 = [dct_of_timestamp_cam0[func_of_key(key, dct_of_timestamp_cam0.keys())] for key in keys]
-            lst_cam1 = [dct_of_timestamp_cam1[func_of_key(key, dct_of_timestamp_cam1.keys())] for key in keys]
+            # lst_cam0 = [dct_of_timestamp_cam0[func_of_key(key, dct_of_timestamp_cam0.keys())] for key in keys]
+            # lst_cam1 = [dct_of_timestamp_cam1[func_of_key(key, dct_of_timestamp_cam1.keys())] for key in keys]
+            
+            keys = sorted(targets.keys())
+
+            # создаём СВОИ индексы
+            lst_cam0 = [dct_of_timestamp_cam0[k] for k in sorted(dct_of_timestamp_cam0.keys())]
+            lst_cam1 = [dct_of_timestamp_cam1[k] for k in sorted(dct_of_timestamp_cam1.keys())]
+
+            # теперь синхронизируем по индексу
+            n = min(len(keys), len(lst_cam0), len(lst_cam1))
+
+            keys = keys[:n]
+            lst_cam0 = lst_cam0[:n]
+            lst_cam1 = lst_cam1[:n]
 
             lst_target = self._get_coord(targets, keys)
             
@@ -271,52 +284,54 @@ class mavDatasetVIO(mavDatasetCNN_3D):
         return targets, dct_of_timestamp_cam0, dct_of_timestamp_cam1, dct_of_timestamp_imu
     
     @staticmethod
-    def __get_imu_slices(lst_x1, imu_keys_sorted, dct_of_timestamp_imu, k=10):
+    def __get_imu_slices(lst_x1_ts, imu_keys_sorted, dct_of_timestamp_imu, k=10):
+
         lst_imu = []
         lst_dt = []
-        
-        for t0, t1 in lst_x1:
-            
-            imu_slice = []
-            imu_t = []
-            mark = True
-            
+
+        for t0, t1 in lst_x1_ts:
+
+
             i0 = bisect.bisect_left(imu_keys_sorted, t0)
             i1 = bisect.bisect_left(imu_keys_sorted, t1)
-            
+
             imu_t = imu_keys_sorted[i0:i1]
-            
+
+
             if len(imu_t) < 2:
-                imu_t = [t0, t1]    
-                mark = False
-            
-            
-            imu_t = imu_t[-(k+1):]
-            dt = [(_time1 - _time0) * 1e-9 for _time0, _time1 in zip(imu_t[:-1], imu_t[1:])] if len(imu_t) >= 2  else [(t1 - t0) * 1e-9]
-                
-            if mark:
-                imu_slice = [dct_of_timestamp_imu[t] for t in imu_t[1:]]    
-                
-            if len(imu_slice) == 0:
-                imu_slice.append([0, 0, 0, 0, 0, 0])
-                
-                
+                dt = [(t1 - t0) * 1e-9]
+                imu_slice = [[0,0,0,0,0,0]]
+
+            else:
+
+                imu_t = imu_t[-(k+1):]
+
+                dt = [
+                    (_t1 - _t0) * 1e-9
+                    for _t0, _t1 in zip(imu_t[:-1], imu_t[1:])
+                ]
+
+                imu_slice = [
+                    dct_of_timestamp_imu[t]
+                    for t in imu_t[1:]
+                ]
+
+
             if len(imu_slice) < k:
                 pad_size = k - len(imu_slice)
-            
-                pad_value = imu_slice[0]
-                pad_value_t = dt[0]
-            
-                pad = [pad_value.copy() for _ in range(pad_size)]
-                pad_t = [pad_value_t for _ in range(pad_size)]
-                imu_slice = pad + imu_slice
-                dt = pad_t + dt
-                
-            dt = torch.tensor(dt, dtype=torch.float64)
+
+                pad_imu = imu_slice[0] if len(imu_slice) > 0 else [0]*6
+                pad_dt = dt[0] if len(dt) > 0 else (t1 - t0) * 1e-9
+
+                imu_slice = [pad_imu]*pad_size + imu_slice
+                dt = [pad_dt]*pad_size + dt
+
             imu_tensor = torch.tensor(imu_slice, dtype=torch.float64)
+            dt_tensor = torch.tensor(dt, dtype=torch.float64).unsqueeze(-1)
+
             lst_imu.append(imu_tensor)
-            lst_dt.append(dt.unsqueeze(-1))
-            
+            lst_dt.append(dt_tensor)
+
         return lst_imu, lst_dt
     
     def _get_data(self, lst_of_datasets):
@@ -330,21 +345,25 @@ class mavDatasetVIO(mavDatasetCNN_3D):
         
             targets, dct_of_timestamp_cam0, dct_of_timestamp_cam1, dct_of_timestamp_imu = self._get_data_from_path(path_local)
             
-            keys = sorted(targets.keys())
-            func_of_key = lambda x, y: x if x in y else min(y, key=lambda k: (abs(k - x), k))
-            
-            # Блок синхронизации камер и GT
-            lst_cam0_ts = [func_of_key(key, dct_of_timestamp_cam0.keys()) for key in keys]
-            lst_cam1_ts = [func_of_key(key, dct_of_timestamp_cam1.keys()) for key in keys]
-            
-            lst_cam0 = [dct_of_timestamp_cam0[key] for key in lst_cam0_ts]
-            lst_cam1 = [dct_of_timestamp_cam1[key] for key in lst_cam1_ts]            
+            cam0_keys = sorted(dct_of_timestamp_cam0.keys())
+            cam1_keys = sorted(dct_of_timestamp_cam1.keys())
+            gt_keys = sorted(targets.keys())
+
+            n = min(len(cam0_keys), len(cam1_keys), len(gt_keys))
+
+            cam0_keys = cam0_keys[:n]
+            cam1_keys = cam1_keys[:n]
+            keys = gt_keys[:n]
+
+            lst_cam0 = [dct_of_timestamp_cam0[k] for k in cam0_keys]
+            lst_cam1 = [dct_of_timestamp_cam1[k] for k in cam1_keys]    
 
             lst_target = self._get_coord(targets, keys)
             
             self._get_group_of_dataset(lst_target) # Записали границы датасета
             
-            lst_x1_ts = list(zip(lst_cam0_ts[:-1], lst_cam0_ts[1:]))
+            lst_x1_ts = list(zip(cam0_keys[:-1], cam0_keys[1:]))
+
             lst_x1 = list(zip(lst_cam0[:-1], lst_cam0[1:]))
             lst_x2 = list(zip(lst_cam1[:-1], lst_cam1[1:]))
             
