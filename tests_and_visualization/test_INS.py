@@ -21,7 +21,7 @@ transform = T.Compose([
 normalize = None
 
 lst_of_dataset = os.listdir('datasets/simulation')
-lst_of_dataset_test = ['mav_fast_descent_turns_500m']
+lst_of_dataset_test = ['mav_square']
 
 dataset = mavDatasetVIO(
     'datasets/simulation', 
