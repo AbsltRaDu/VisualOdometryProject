@@ -5,10 +5,11 @@ import cv2
 
 from src.geometry.PoseTorch import PoseTorch as PT
 from src.geometry.TrajectoryTorch import TrajectoryTorch as TT
+from src.metrics.KITTI_metrics import get_KITTI_metrices
 
 class CNNSimulationStep:
     
-    def __init__(self, model, device, visualization=False, loss=None):
+    def __init__(self, model, device, visualization=False, loss=None, win_size=10):
 
         self.model = model
         self.device = device
@@ -18,6 +19,11 @@ class CNNSimulationStep:
         
         self.visualization = visualization
         self.loss = loss
+
+        self.step_for_loss_trajectory = 0
+        self.win_size = win_size
+        self.p_mean = 0
+        self.r_mean = 0
         
         self.loss_pose_mean = 0
         self.lm_count = 0
@@ -38,7 +44,6 @@ class CNNSimulationStep:
         
         if self.loss is not None:
             self.loss(self.predict, self.y)
-            
     
     def teke_after_denorm(self, predict):
         self.predict_denorm = predict
@@ -65,6 +70,23 @@ class CNNSimulationStep:
         else:
             self.trajectory = self.trajectory.extend_lie_relative(self.predict_denorm)
             self.trajectory_fact = self.trajectory_fact.extend_lie_relative(self.y)
+    
+    def get_metrice(self, step):
+        trajectory_fact_win = self.trajectory_fact[self.step_for_loss_trajectory:self.step_for_loss_trajectory+self.win_size]
+        trajectory_pred_win = self.trajectory[self.step_for_loss_trajectory:self.step_for_loss_trajectory+self.win_size]
+        
+        path_lengh = trajectory_fact_win.path_length()
+        motion_fact = trajectory_fact_win.relative_motion()
+        motion_pred = trajectory_pred_win.relative_motion()
+
+        r_mean_loc, p_mean_loc = get_KITTI_metrices(motion_fact, motion_pred, path_lengh) 
+        
+        lm = step // self.win_size
+        
+        self.p_mean = 1 / lm * p_mean_loc.mean().item() + (1 - 1 / lm) * self.p_mean
+        self.r_mean = 1 / lm * r_mean_loc.mean().item() + (1 - 1 / lm) * self.r_mean
+        
+        self.step_for_loss_trajectory = step
     
     def get_position(self):
 
