@@ -148,7 +148,7 @@ class DeepVOimulationStep(CNNSimulationStep):
         # if self.hidden is not None:
         #     self.hidden = self.hidden.to(self.device)
 
-        predict, self.hidden = self.model(self.x.unsqueeze(dim=0), None)
+        predict, self.hidden = self.model(self.x.unsqueeze(dim=0), self.hidden)
         
         predict = PT.from_euler(predict).as_lie()
         

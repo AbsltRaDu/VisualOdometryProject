@@ -25,32 +25,32 @@ transform = T.Compose([
 
 normalize = None
 
-lst_of_dataset = [i for i in os.listdir('datasets/sequences') if i != 'poses']
-lst_of_dataset_train = lst_of_dataset[1:]
-lst_of_dataset_test = ['03']
+# lst_of_dataset = [i for i in os.listdir('datasets/sequences') if i != 'poses']
+# lst_of_dataset_train = lst_of_dataset[1:]
+# lst_of_dataset_test = ['03']
 
-dataset = kittiDataset_3D(
-    'datasets/sequences',
-    'datasets/sequences/poses',
-    transform,
-    normalize=normalize,
-    device='cpu',
-    lst_of_datasets=lst_of_dataset_test,
-    stereo=False
-    )
-
-
-# lst_of_dataset = os.listdir('datasets/simulation')
-# lst_of_dataset_test = ['mav_square']
-
-# dataset = mavDatasetCNN_3D(
-#     'datasets/simulation', 
+# dataset = kittiDataset_3D(
+#     'datasets/sequences',
+#     'datasets/sequences/poses',
 #     transform,
 #     normalize=normalize,
 #     device='cpu',
 #     lst_of_datasets=lst_of_dataset_test,
 #     stereo=False
 #     )
+
+
+lst_of_dataset = os.listdir('datasets/simulation_2')
+lst_of_dataset_test = ['mav_look_forward_square_400m']
+# lst_of_dataset_test = ['mav_mixed_random_short_500m']
+
+dataset = mavDatasetCNN_3D(
+    'datasets/simulation_2', 
+    transform,
+    normalize=normalize,
+    device='cpu',
+    lst_of_datasets=lst_of_dataset_test
+    )
 
 dtrain = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')

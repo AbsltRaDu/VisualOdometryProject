@@ -7,10 +7,7 @@ from torch import Tensor
 
 
 class CNN(nn.Module):
-    """
-    CNN backbone to extract spatial features from input images.
-    This module takes in a single image and outputs a 1D feature vector per image.
-    """
+
 
     def __init__(
         self,
@@ -20,7 +17,6 @@ class CNN(nn.Module):
     ) -> None:
         super(CNN, self).__init__()
 
-        # CNN layers
         self.relu = nn.ReLU(inplace=True)
         self.dropout = nn.Dropout(p=conv_dropout)
         self.conv1 = nn.Conv2d(input_channels, 64, kernel_size=7, stride=2, padding=3)
@@ -34,20 +30,12 @@ class CNN(nn.Module):
         self.conv6 = nn.Conv2d(512, 1024, kernel_size=3, stride=2, padding=1)
         self.flatten = nn.Flatten()
 
-        # Get features dimention (1024 * (W/64) * (H/64) = (W * H) / 4)
+
         x = torch.zeros(1, input_channels, *input_res)
         self.features_dim = int(np.prod(self.forward(x).size()))
 
     def forward(self, x: Tensor) -> Tensor:
-        """Forward pass through the CNN feature extractor.
 
-        Args:
-            x (Tensor): Input tensor of shape (batch_size, channels, height, width).
-
-        Returns:
-            Tensor: Extracted features of shape (batch_size, features_dim).
-        """
-        # Pass through each layer
         x = self.dropout(self.relu(self.conv1(x)))
         x = self.dropout(self.relu(self.conv2(x)))
         x = self.dropout(self.relu(self.conv3(x)))
@@ -62,11 +50,7 @@ class CNN(nn.Module):
 
 
 class DeepVO(nn.Module):
-    """DeepVO model for monocular visual odometry.
 
-    This model estimates relative pose (translation and rotation) between frames using
-    a CNN for feature extraction and an LSTM for temporal dependency modeling.
-    """
 
     def __init__(
         self,
@@ -77,16 +61,8 @@ class DeepVO(nn.Module):
         output_size: int = 6,
         lstm_dropout: float = 0.2,
         conv_dropout: float = 0.1,
-        predtrained=True
     ) -> None:
-        """
-        Args:
-            input_channels (int): Number of channels in the input image. Default is 3 for RGB images.
-            hidden_size (int): Number of features in the hidden state of the LSTM.
-            lstm_layers (int): Number of layers in the LSTM.
-            output_size (int): Dimensionality of the output pose (6 for 3D translation and rotation).
-            lstm_dropout (float): Dropout in LSTM layer.
-        """
+
         super(DeepVO, self).__init__()
 
         self.feature_extractor = CNN(
@@ -106,15 +82,7 @@ class DeepVO(nn.Module):
 
     def forward(
         self, x_seq: Tensor, hidden_state: Optional[Tuple[Tensor, Tensor]] = None) -> Tensor:
-        """Forward pass through the DeepVO model.
 
-        Args:
-            x (Tensor): Input tensor of shape (batch_size, sequence_length, channels, height, width).
-            hidden_state (Optional[Tuple[Tensor, Tensor]]): Optional initial hidden state and cell state for the LSTM.
-
-        Returns:
-            Tensor: Output poses.
-        """
         
         if x_seq.ndim != 5:
             raise ValueError(f"x_seq должен иметь форму (B, S, 12, H, W), а получил {x_seq.shape}")
@@ -134,16 +102,6 @@ class DeepVO(nn.Module):
         fused_seq = torch.stack(fused_features, dim=1) # Собираем последовательность признаков
         features = fused_seq.view(B, S, -1)
         
-        
-        # batch_size = x.size(0)
-
-        # # Features extractor with CNN
-        # features = self.feature_extractor(x)
-
-        # # Reshape features for the LSTM input (batch_size x 1 x features_dim)
-        # features = features.view(batch_size, 1, -1)
-
-        # Forward pass through LSTM
         lstm_out, hidden_state = self.lstm(features, hidden_state)
 
         # Forward pass through fully connected layer to predict pose

@@ -33,51 +33,57 @@ transform = T.Compose([
 # normalize.load('process_of_fitting/normalize_params/params_of_normalize.json')
 normalize = None
 
-lst_of_dataset = [i for i in os.listdir('datasets/sequences') if i != 'poses']
-lst_of_dataset_train = ["00", "02", "08", "09"]
-lst_of_dataset_test = ["03"]
+# lst_of_dataset = [i for i in os.listdir('datasets/sequences') if i != 'poses']
+# lst_of_dataset_train = ["00", "02", "08", "09"]
+# lst_of_dataset_test = ["03"]
 
-dataset_train = kittiDataset_3D(
-    'datasets/sequences',
-    'datasets/sequences/poses',
-    transform,
-    normalize=normalize,
-    device='cpu',
-    lst_of_datasets=lst_of_dataset_train,
-    stereo=False
-    )
-
-dataset_test = kittiDataset_3D(
-    'datasets/sequences',
-    'datasets/sequences/poses',
-    transform,
-    normalize=normalize,
-    device='cpu',
-    lst_of_datasets=lst_of_dataset_test,
-    stereo=False
-    )
-
-# lst_of_dataset = os.listdir('datasets/simulation')
-# lst_of_dataset_train = lst_of_dataset[:-1]
-# lst_of_dataset_test = lst_of_dataset[-1]
-# # lst_of_dataset_test = ['mav_mixed_random_short_500m']
-
-
-# dataset_train = mavDatasetCNN_3D(
-#     'datasets/simulation', 
+# dataset_train = kittiDataset_3D(
+#     'datasets/sequences',
+#     'datasets/sequences/poses',
 #     transform,
 #     normalize=normalize,
 #     device='cpu',
-#     lst_of_datasets=lst_of_dataset_train
-#     ) 
-
-# dataset_test = mavDatasetCNN_3D(
-#     'datasets/simulation', 
-#     transform,
-#     normalize=normalize,
-#     device='cpu',
-#     lst_of_datasets=lst_of_dataset_test
+#     lst_of_datasets=lst_of_dataset_train,
+#     stereo=False
 #     )
+
+# dataset_test = kittiDataset_3D(
+#     'datasets/sequences',
+#     'datasets/sequences/poses',
+#     transform,
+#     normalize=normalize,
+#     device='cpu',
+#     lst_of_datasets=lst_of_dataset_test,
+#     stereo=False
+#     )
+
+lst_of_dataset = os.listdir('datasets/simulation_2')
+lst_of_dataset_test = ['mav_look_forward_rectangle_500m', 
+                       'mav_look_forward_climb_soft_turns_450m', 
+                       'mav_look_forward_soft_s_curve_500m', 
+                       'mav_look_forward_long_soft_zigzag_altitude_750m',
+                       'mav_look_forward_descent_soft_turns_450m']
+lst_of_dataset_train = [i for i in lst_of_dataset if i not in lst_of_dataset_test]
+lst_of_dataset_test = ['mav_look_forward_square_400m']
+
+# lst_of_dataset_test = ['mav_mixed_random_short_500m']
+
+
+dataset_train = mavDatasetCNN_3D(
+    'datasets/simulation_2', 
+    transform,
+    normalize=normalize,
+    device='cpu',
+    lst_of_datasets=lst_of_dataset_train
+    ) 
+
+dataset_test = mavDatasetCNN_3D(
+    'datasets/simulation_2', 
+    transform,
+    normalize=normalize,
+    device='cpu',
+    lst_of_datasets=lst_of_dataset_test
+    )
 
 WINDOW_SIZE = 10
 
@@ -102,14 +108,14 @@ print('Размерность T_m:', example_of_obj[2].shape, sep=' ')
 model = DeepVO()
 model = model.to(device)
 
-path = "process_of_fitting/fitting_models/checkpoint_e190.pth"
-checkpoint = torch.load(path, map_location="cpu", weights_only=False)
-model.load_state_dict(checkpoint['model_state_dict'])
+# path = "process_of_fitting/fitting_models/checkpoint_e190.pth"
+# checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+# model.load_state_dict(checkpoint['model_state_dict'])
 
-# if os.path.isfile('process_of_fitting/fitting_models/DeepVO_KITTI.tar'):
-#     state_dict_cnn = torch.load('process_of_fitting/fitting_models/DeepVO_KITTI.tar', map_location=device)
-#     model.load_state_dict(state_dict_cnn)
-#     print('Были загружены веса модели с контрольной точки')
+if os.path.isfile('process_of_fitting/fitting_models/DeepVO_AirSim.tar'):
+    state_dict_cnn = torch.load('process_of_fitting/fitting_models/DeepVO_AirSim.tar', map_location=device)
+    model.load_state_dict(state_dict_cnn)
+    print('Были загружены веса модели с контрольной точки')
 
 for param in model.feature_extractor.parameters():
     param.requires_grad = False
@@ -151,8 +157,8 @@ pipline = TrainerDeepVO(
     epochs=epochs,
     device=device,
     normalize=normalize,
-    name_of_model=os.path.join('process_of_fitting/fitting_models', 'DeepVO_KITTI.tar'),
-    path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'DeepVO_KITTI.json'),
+    name_of_model=os.path.join('process_of_fitting/fitting_models', 'DeepVO_AirSim.tar'),
+    path_to_save_process_of_fitting=os.path.join('process_of_fitting/result_of_fitting', 'DeepVO_AirSim.json'),
     window_size=WINDOW_SIZE,
     weight_trajectory=0
 )
