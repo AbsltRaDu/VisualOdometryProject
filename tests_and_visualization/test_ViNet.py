@@ -3,10 +3,11 @@ import os
 import torch
 from torchvision import transforms as T
 
-from src.dataloaders.datasets_for_CNN import mavDatasetCNN_3D
+from src.dataloaders.datasets_for_CNN import mavDatasetVIO
 from src.dataloaders.datasets_KITTI import kittiDataset_3D
-from src.models.modelsNN.DeepVOFRA import DeepVO
-from src.piplines.SimulationPipline import SimulationDeepVO
+from src.models.modelsNN.DeepVOFRA import CNN
+from src.models.modelsNN.ViNet import ViNet, imuEncoder
+from src.piplines.SimulationPipline import SimulationRNNIMU
 from src.function_of_loss.mse_pose import PoseLoss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -44,43 +45,38 @@ lst_of_dataset = os.listdir('datasets/simulation_2')
 lst_of_dataset_test = ['mav_look_forward_climb_soft_turns_450m']
 # lst_of_dataset_test = ['mav_mixed_random_short_500m']
 
-dataset = mavDatasetCNN_3D(
+dataset = mavDatasetVIO(
     'datasets/simulation_2', 
     transform,
     normalize=normalize,
     device='cpu',
-    lst_of_datasets=lst_of_dataset_test
+    lst_of_datasets=lst_of_dataset_test,
+    num_of_imu=12
     )
-
-# lst_of_dataset = os.listdir('datasets/simulation')
-# lst_of_dataset_test = ['mav_square']
-
-# dataset = mavDatasetCNN_3D(
-#     'datasets/simulation', 
-#     transform,
-#     normalize=normalize,
-#     device='cpu',
-#     lst_of_datasets=lst_of_dataset_test,
-#     stereo=False,
-#     )
 
 dtrain = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')
 
-model = DeepVO()
+visual_encoder = CNN(input_res=[192, 640])
+visual_encoder = visual_encoder.to(device)
+
+imu_encoder = imuEncoder()
+imu_encoder = imu_encoder.to(device)
+
+model = ViNet(VisualEncoder=visual_encoder, imuEncoder=imu_encoder)
 model = model.to(device)
 
 # path = "process_of_fitting/fitting_models/checkpoint_e190.pth"
 # checkpoint = torch.load(path, map_location="cpu", weights_only=False)
 # model.load_state_dict(checkpoint['model_state_dict'])
 
-state_dict_cnn = torch.load('process_of_fitting/fitting_models/DeepVO_AirSim.tar', map_location=device)
+state_dict_cnn = torch.load('process_of_fitting/fitting_models/ViNet_AirSim.tar', map_location=device)
 model.load_state_dict(state_dict_cnn)
 model = model.to(device)
 
 dtrain = iter(dtrain)
 loss_func = PoseLoss()
 
-simulation = SimulationDeepVO(model=model, device=device, dtrain=dtrain, norm=normalize, loss=loss_func, win_size=100, path_file_of_result='tests_and_visualization/results_of_models/DeepVO4')
+simulation = SimulationRNNIMU(model=model, device=device, dtrain=dtrain, norm=normalize, loss=loss_func, win_size=100, path_file_of_result='tests_and_visualization/results_of_models/ViNet4')
 simulation()
 simulation.get_pictures()

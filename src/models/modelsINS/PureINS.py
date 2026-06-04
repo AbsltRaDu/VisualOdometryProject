@@ -105,8 +105,8 @@ class INSPropagator:
 
             # Выполняем один шаг propagation
             pose_new, velocity = self.step(pose_new, velocity, gyro_s, accel_s, dt_s)
-
-            y = pose.inv() * pose_new
+            
+            y = pose_new
             
             # Сохраняем состояние, если нужно вернуть всю траекторию
             if return_all:

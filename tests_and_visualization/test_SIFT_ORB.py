@@ -10,18 +10,18 @@ from src.piplines.SimulationPipline import SimulationClassic
 
 
 transform = T.Compose([
-    # T.Resize((192, 320)),
+    # T.Resize((192, 640)),
     TorchImageToCvGray()
 ])
 
 normalize = None
 
 
-lst_of_dataset = os.listdir('datasets/simulation')
-lst_of_dataset_test = ['mav_square']
+lst_of_dataset = os.listdir('datasets/simulation_2')
+lst_of_dataset_test = ['mav_look_forward_climb_soft_turns_450m']
 
 dataset = mavDatasetCNN_3D(
-    'datasets/simulation', 
+    'datasets/simulation_2', 
     transform,
     normalize=normalize,
     device='cpu',
@@ -35,17 +35,18 @@ print('Длина датасета:', len(dataset), sep=' ')
 
 config = FeatureStereoVOConfig(
     camera=StereoCameraConfig(
-        width=752,
-        height=480,
-        new_width=752,
-        new_height=480,
+        width=1241,
+        height=376,
+        new_width=1241,
+        new_height=376,
         fov_deg=90.0,
-        baseline=0.2,
+        baseline=0.6,
     ),
     feature_type="orb",
     nfeatures=8000,
-    ratio_test=0.95,
+    ratio_test=0.75,
     return_debug=False,
+    max_depth=500, min_depth=0.1
 )
 
 model = CV2FeatureStereoVO(config)
@@ -53,6 +54,6 @@ dtrain = iter(dtrain)
 
 print(next(dtrain)[0].shape)
 
-simulation = SimulationClassic(model=model, device='cpu', dtrain=dtrain, norm=normalize)
+simulation = SimulationClassic(model=model, device='cpu', dtrain=dtrain, norm=normalize, visualization=False, path_file_of_result='tests_and_visualization/results_of_models/ORB1.json', win_size=100)
 simulation()
 simulation.get_pictures()

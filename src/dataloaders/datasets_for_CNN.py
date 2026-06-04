@@ -20,13 +20,16 @@ from src.geometry.PoseTorch import PoseTorch as PT
     
 class mavDatasetCNN_3D(data.Dataset):
 
-    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None):
+    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, start=0, end=-1):
         self.transform = transform
         self.path = path
         self.device=device
         self.dataset_group = []
-        self.max_size = max_size
+
         self.stereo = stereo
+        
+        self.start = start
+        self.end = end
         
         self.normalize = normalize
         
@@ -42,10 +45,10 @@ class mavDatasetCNN_3D(data.Dataset):
         # Блок объединения датасетов
         self._get_data(lst_of_datasets)
         
-        if self.max_size is not None:
-            self.lst_target = self.lst_target[:self.max_size]
-            self.lst_x1 = self.lst_x1[:self.max_size]
-            self.lst_x2 = self.lst_x2[:self.max_size]
+        if self.start != 0 or self.end != -1:
+            self.lst_target = self.lst_target[self.start:self.end]
+            self.lst_x1 = self.lst_x1[self.start:self.end]
+            self.lst_x2 = self.lst_x2[self.start:self.end]
 
             self.dataset_group = [(0, len(self.lst_target))]
         
@@ -219,7 +222,7 @@ class mavDatasetCNN_3D_euler(mavDatasetCNN_3D):
     
 class mavDatasetVIO(mavDatasetCNN_3D):
     
-    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None, num_of_imu=10, get_imu_t: bool = False):
+    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None, num_of_imu=10, get_imu_t: bool = False, start=0, end=-1):
         '''
         Расширение mavDatasetCNN_3D с добавление IMU
         '''
@@ -228,12 +231,15 @@ class mavDatasetVIO(mavDatasetCNN_3D):
         self.path = path
         self.device=device
         self.dataset_group = []
-        self.max_size = max_size
+
         self.num_of_imu = num_of_imu
         self.stereo = stereo
         self.get_imu_t = get_imu_t
         
         self.normalize = normalize
+        
+        self.start = start
+        self.end = end
         
         self.lst_target = [] # Словарь временных меток и значений по каждому датасету
         self.lst_x1 = [] # Путь до фото с камеры 1
@@ -248,13 +254,13 @@ class mavDatasetVIO(mavDatasetCNN_3D):
         
         # Блок объединения датасетов
         self._get_data(lst_of_datasets)
-        
-        if self.max_size is not None:
-            self.lst_target = self.lst_target[:self.max_size]
-            self.lst_x1 = self.lst_x1[:self.max_size]
-            self.lst_x2 = self.lst_x2[:self.max_size]
-            self.lst_imu = self.lst_imu[:self.max_size]
-
+            
+        if self.start != 0 or self.end != -1:
+            self.lst_target = self.lst_target[self.start:self.end]
+            self.lst_x1 = self.lst_x1[self.start:self.end]
+            self.lst_x2 = self.lst_x2[self.start:self.end]
+            self.lst_imu = self.lst_imu[self.start:self.end]
+            
             self.dataset_group = [(0, len(self.lst_target))]
         
         self.length = len(self.lst_target)
@@ -300,11 +306,11 @@ class mavDatasetVIO(mavDatasetCNN_3D):
 
             if len(imu_t) < 2:
                 dt = [(t1 - t0) * 1e-9]
-                imu_slice = [[0,0,0,0,0,0]]
-
+                imu_slice = [[0, 0, 0, 0, 0, 0]]
             else:
 
-                imu_t = imu_t[-(k+1):]
+                if k is not None:
+                    imu_t = imu_t[-(k+1):]
 
                 dt = [
                     (_t1 - _t0) * 1e-9
@@ -317,14 +323,19 @@ class mavDatasetVIO(mavDatasetCNN_3D):
                 ]
 
 
-            if len(imu_slice) < k:
+            if len(imu_slice) == 0:
+                imu_slice = [[0, 0, 0, 0, 0, 0]]
+                dt = [(t1 - t0) * 1e-9]
+
+
+            if k is not None and len(imu_slice) < k:
                 pad_size = k - len(imu_slice)
 
-                pad_imu = imu_slice[0] if len(imu_slice) > 0 else [0]*6
-                pad_dt = dt[0] if len(dt) > 0 else (t1 - t0) * 1e-9
+                pad_imu = imu_slice[0]
+                pad_dt = dt[0]
 
-                imu_slice = [pad_imu]*pad_size + imu_slice
-                dt = [pad_dt]*pad_size + dt
+                imu_slice = [pad_imu.copy() for _ in range(pad_size)] + imu_slice
+                dt = [pad_dt for _ in range(pad_size)] + dt
 
             imu_tensor = torch.tensor(imu_slice, dtype=torch.float64)
             dt_tensor = torch.tensor(dt, dtype=torch.float64).unsqueeze(-1)
@@ -376,6 +387,7 @@ class mavDatasetVIO(mavDatasetCNN_3D):
             self.lst_x2 += lst_x2
             self.lst_imu += lst_imu
             self.lst_t += lst_t
+            
     
     def __getitem__(self, item):
 
@@ -395,6 +407,253 @@ class mavDatasetVIO(mavDatasetCNN_3D):
     
         return x, imu, y, T_m
     
+
+class mavDatasetGPS(mavDatasetVIO):
+    
+    def __init__(self, path, transform=None, normalize=None, device='cpu', lst_of_datasets=[], stereo: bool = False, max_size=None, num_of_imu=10, get_imu_t: bool = False, start=0, end=-1):
+        '''
+        Расширение mavDatasetCNN_3D с добавление IMU
+        '''
+        
+        self.transform = transform
+        self.path = path
+        self.device=device
+        self.dataset_group = []
+
+        self.num_of_imu = num_of_imu
+        self.stereo = stereo
+        self.get_imu_t = get_imu_t
+        
+        self.normalize = normalize
+        
+        self.start = start
+        self.end = end
+        
+        self.lst_target = [] # Словарь временных меток и значений по каждому датасету
+        self.lst_x1 = [] # Путь до фото с камеры 1
+        self.lst_x2 = [] # путь до фото сс камеры 2
+        self.lst_imu = []
+        self.lst_t = []
+        self.lst_gps = []
+        
+        self.pair = [] # Пары изображений
+        
+        if not lst_of_datasets:
+            lst_of_datasets = os.listdir(self.path)
+        
+        # Блок объединения датасетов
+        self._get_data(lst_of_datasets)
+            
+        if self.start != 0 or self.end != -1:
+            self.lst_target = self.lst_target[self.start:self.end]
+            self.lst_x1 = self.lst_x1[self.start:self.end]
+            self.lst_x2 = self.lst_x2[self.start:self.end]
+            self.lst_imu = self.lst_imu[self.start:self.end]
+            
+            self.dataset_group = [(0, len(self.lst_target))]
+        
+        self.length = len(self.lst_target)
+    
+    
+    @staticmethod
+    def _get_data_from_path(path_local):
+        
+        # Блок обработки координат
+        with open(os.path.join(path_local, 'state_groundtruth_estimate0/data.csv'), 'r', encoding='utf-8') as f: # Вытаскиваю словарь таймстемпов с координатами
+            targets = {int(dct['#timestamp']): [float(dct[' p_RS_R_x [m]']), float(dct[' p_RS_R_y [m]']), float(dct[' p_RS_R_z [m]']),
+                                                float(dct[' q_RS_w []']), float(dct[' q_RS_x []']), float(dct[' q_RS_y []']), float(dct[' q_RS_z []'])] for dct in csv.DictReader(f)}
+        
+        # Блок обработки камеры 0
+        with open(os.path.join(path_local, 'cam0/data.csv'), 'r', encoding='utf-8') as f: # Вытаскиваю словарь камеры 1
+            dct_of_timestamp_cam0 = {int(dct['#timestamp [ns]']): os.path.join(path_local, f"cam0/data/{dct['filename']}")  for dct in csv.DictReader(f)}
+        
+        # Блок обработки камеры 1
+        with open(os.path.join(path_local, 'cam1/data.csv'), 'r', encoding='utf-8') as f: # Вытаскиваю словарь камеры 1
+            dct_of_timestamp_cam1 = {int(dct['#timestamp [ns]']): os.path.join(path_local, f"cam1/data/{dct['filename']}") for dct in csv.DictReader(f)}
+
+        with open(os.path.join(path_local, 'imu0/data.csv'), 'r', encoding='utf-8') as f:
+            dct_of_timestamp_imu = {int(dct['#timestamp [ns]']): [float(dct['w_RS_S_x [rad s^-1]']), float(dct['w_RS_S_y [rad s^-1]']), float(dct['w_RS_S_z [rad s^-1]']),
+                                                                  float(dct['a_RS_S_x [m s^-2]']), float(dct['a_RS_S_y [m s^-2]']), float(dct['a_RS_S_z [m s^-2]'])]
+                                    for dct in csv.DictReader(f)}
+         
+        with open(os.path.join(path_local, 'gps0/data.csv'), 'r', encoding='utf-8') as f:
+            dct_of_timestamp_gps = {
+                int(dct['#timestamp [ns]']): [
+                    float(dct['latitude [deg]']),
+                    float(dct['longitude [deg]']),
+                    float(dct['altitude [m]']),
+                    float(dct['v_x [m s^-1]']),
+                    float(dct['v_y [m s^-1]']),
+                    float(dct['v_z [m s^-1]'])
+                ]
+                for dct in csv.DictReader(f)
+            }
+            
+        return targets, dct_of_timestamp_cam0, dct_of_timestamp_cam1, dct_of_timestamp_imu, dct_of_timestamp_gps
+    
+    @staticmethod
+    def __get_imu_slices(lst_x1_ts, imu_keys_sorted, dct_of_timestamp_imu, k=10):
+
+        lst_imu = []
+        lst_dt = []
+
+        for t0, t1 in lst_x1_ts:
+
+
+            i0 = bisect.bisect_left(imu_keys_sorted, t0)
+            i1 = bisect.bisect_left(imu_keys_sorted, t1)
+
+            imu_t = imu_keys_sorted[i0:i1]
+
+
+            if len(imu_t) < 2:
+                dt = [(t1 - t0) * 1e-9]
+                imu_slice = [[0, 0, 0, 0, 0, 0]]
+            else:
+
+                if k is not None:
+                    imu_t = imu_t[-(k+1):]
+
+                dt = [
+                    (_t1 - _t0) * 1e-9
+                    for _t0, _t1 in zip(imu_t[:-1], imu_t[1:])
+                ]
+
+                imu_slice = [
+                    dct_of_timestamp_imu[t]
+                    for t in imu_t[1:]
+                ]
+
+
+            if len(imu_slice) == 0:
+                imu_slice = [[0, 0, 0, 0, 0, 0]]
+                dt = [(t1 - t0) * 1e-9]
+
+
+            if k is not None and len(imu_slice) < k:
+                pad_size = k - len(imu_slice)
+
+                pad_imu = imu_slice[0]
+                pad_dt = dt[0]
+
+                imu_slice = [pad_imu.copy() for _ in range(pad_size)] + imu_slice
+                dt = [pad_dt for _ in range(pad_size)] + dt
+
+            imu_tensor = torch.tensor(imu_slice, dtype=torch.float64)
+            dt_tensor = torch.tensor(dt, dtype=torch.float64).unsqueeze(-1)
+
+            lst_imu.append(imu_tensor)
+            lst_dt.append(dt_tensor)
+
+        return lst_imu, lst_dt
+    
+    @staticmethod
+    def __get_gps_slices(lst_x1_ts, gps_keys_sorted, dct_of_timestamp_gps):
+
+        lst_gps = []
+
+        for t0, t1 in lst_x1_ts:
+
+
+            i0 = bisect.bisect_left(gps_keys_sorted, t0)   # левый индекс (включая t0)
+            i1 = bisect.bisect_right(gps_keys_sorted, t1)  # правый индекс (включая t1)
+
+            gps_t = gps_keys_sorted[i0:i1]
+
+     
+            if len(gps_t) > 0:
+                gps_slice = [
+                    dct_of_timestamp_gps[t]  # берём измерения
+                    for t in gps_t
+                ]
+
+                gps_tensor = torch.tensor(
+                    gps_slice,
+                    dtype=torch.float64
+                )
+
+
+            else:
+                gps_tensor = torch.empty(
+                    (0, 6), 
+                    dtype=torch.float64
+                )
+
+            lst_gps.append(gps_tensor)
+
+        return lst_gps
+
+
+    def _get_data(self, lst_of_datasets):
+         
+        # Блок объединения датасетов
+        self.start_idx = 0
+        self.start_idx_dataset = 0
+        
+        for dataset in filter(lambda x: x in lst_of_datasets, os.listdir(self.path)):
+            path_local = os.path.join(self.path, dataset)
+        
+            targets, dct_of_timestamp_cam0, dct_of_timestamp_cam1, dct_of_timestamp_imu, dct_of_timestamp_gps = self._get_data_from_path(path_local)
+            
+            cam0_keys = sorted(dct_of_timestamp_cam0.keys())
+            cam1_keys = sorted(dct_of_timestamp_cam1.keys())
+            gt_keys = sorted(targets.keys())
+
+            n = min(len(cam0_keys), len(cam1_keys), len(gt_keys))
+
+            cam0_keys = cam0_keys[:n]
+            cam1_keys = cam1_keys[:n]
+            keys = gt_keys[:n]
+
+            lst_cam0 = [dct_of_timestamp_cam0[k] for k in cam0_keys]
+            lst_cam1 = [dct_of_timestamp_cam1[k] for k in cam1_keys]    
+
+            lst_target = self._get_coord(targets, keys)
+            
+            self._get_group_of_dataset(lst_target) # Записали границы датасета
+            
+            lst_x1_ts = list(zip(cam0_keys[:-1], cam0_keys[1:]))
+
+            lst_x1 = list(zip(lst_cam0[:-1], lst_cam0[1:]))
+            lst_x2 = list(zip(lst_cam1[:-1], lst_cam1[1:]))
+            
+            # Блок синхронизации INS и камер
+            imu_keys_sorted = sorted(dct_of_timestamp_imu.keys())
+            lst_imu, lst_t = self.__get_imu_slices(lst_x1_ts, imu_keys_sorted, dct_of_timestamp_imu, k=self.num_of_imu) 
+            
+            gps_keys_sorted = sorted(dct_of_timestamp_gps.keys())
+            lst_gps = self.__get_gps_slices(
+                            lst_x1_ts,
+                            gps_keys_sorted,
+                            dct_of_timestamp_gps
+                        )
+            
+            self.lst_target += lst_target
+            self.lst_x1 += lst_x1
+            self.lst_x2 += lst_x2
+            self.lst_imu += lst_imu
+            self.lst_t += lst_t
+            self.lst_gps += lst_gps
+
+            
+    def __getitem__(self, item):
+
+        pair1 = self.lst_x1[item]
+        pair2 = self.lst_x2[item]
+        x = self.get_mat_of_imgs(pair1, pair2)
+        
+        # Вытаскиваем инерциалку
+        imu = self.lst_imu[item]
+        gps = self.lst_gps[item]
+
+        # Получаем координаты
+        y, T_m = self.lst_target[item]
+        
+        if self.get_imu_t:
+            imu_t = self.lst_t[item]
+            return x, imu, imu_t, y, T_m, gps
+    
+        return x, imu, y, T_m, gps
 
 class SequenceDataset(data.Dataset):
     
