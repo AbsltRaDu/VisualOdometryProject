@@ -21,8 +21,10 @@ class LKOpticalFlowVO(nn.Module):
         height: int,
         new_width: int,
         new_height: int,
-        fov_deg: float,
         baseline: float,
+        fov_deg: Optional[float] = None,
+        K: Optional[np.ndarray] = None,
+        dist: Optional[np.ndarray] = None,
         max_corners: int = 3000,
         quality_level: float = 0.01,
         min_distance: int = 7,
@@ -74,8 +76,11 @@ class LKOpticalFlowVO(nn.Module):
         self.height = height
         self.new_width = new_width
         self.new_height = new_height
-        self.fov_deg = fov_deg
         self.baseline = baseline
+        
+        self.K = K
+        self.dist = dist
+        self.fov_deg = fov_deg
 
         self.max_corners = max_corners
         self.quality_level = quality_level
@@ -93,7 +98,7 @@ class LKOpticalFlowVO(nn.Module):
         self.min_pnp_inliers = min_pnp_inliers
         self.return_debug = return_debug
 
-        self.triangulation = TriangulationMod(self.width,self.height,self.new_width,self.new_height,self.fov_deg,self.baseline)
+        self.triangulation = TriangulationMod(self.width,self.height,self.new_width,self.new_height,self.baseline, fov_deg=self.fov_deg, K=self.K)
 
         block = 7
         self.stereo = cv2.StereoSGBM_create(minDisparity=0, numDisparities=16 * 6, blockSize=block, P1=8 * 1 * block ** 2,
@@ -276,6 +281,16 @@ class LKOpticalFlowVO(nn.Module):
 
         return y_pred, debug
 
+    def _undistort(self, img: np.ndarray):
+        '''
+        Убирает дисторсию, если есть параметры камеры
+        '''
+
+        if self.K is None or self.dist is None:
+            return img
+
+        return cv2.undistort(img, self.K, self.dist)
+    
     def forward(self, img_left_1: np.ndarray, img_right_1: np.ndarray, img_left_2: np.ndarray):
         '''
         Основной forward.
@@ -290,6 +305,10 @@ class LKOpticalFlowVO(nn.Module):
                 "num_pnp_points": 0,
                 "num_pnp_inliers": 0,
             }
+
+            img_left_1 = self._undistort(img_left_1)
+            img_right_1 = self._undistort(img_right_1)
+            img_left_2 = self._undistort(img_left_2)
 
             # Считаем dense depth map из stereo-пары t.
             depth, disparity, valid_depth = self._depth_from_sgbm(img_left_1, img_right_1)

@@ -20,24 +20,25 @@ transform = T.Compose([
 
 normalize = None
 
-lst_of_dataset = os.listdir('datasets/simulation')
-lst_of_dataset_test = ['mav_square']
+lst_of_dataset = os.listdir('datasets/euroc_mav')
+lst_of_dataset_test = ['mav0_dif1']
 
 dataset = mavDatasetVIO(
-    'datasets/simulation', 
+    'datasets/euroc_mav', 
     transform,
     normalize=normalize,
     device='cpu',
     lst_of_datasets=lst_of_dataset_test,
-    stereo=False,
+    num_of_imu=None,
     get_imu_t=True,
-    num_of_imu=12
+    stereo=True,
+    end=200
     )
 
 dtrain = torch.utils.data.DataLoader(dataset=dataset, batch_size=1)
 print('Длина датасета:', len(dataset), sep=' ')
 
-propagator = INSPropagator()
+propagator = INSPropagator(gravity=torch.tensor([0, 0, 9.81]), use_updated_rotation_for_accel=False)
 preprocessor = IMUPreprocessor()
 model = PureINSModel(preprocessor, propagator)
 

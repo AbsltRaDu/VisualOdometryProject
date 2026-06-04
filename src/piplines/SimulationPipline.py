@@ -1,13 +1,14 @@
 import torch
 from tqdm import tqdm
 import plotly.graph_objects as go
+import json
 
-from src.piplines.simulationObject import CNNSimulationStep, RNNSimulationStep, RNNIMUSimulationStep, ClassicSimulationStep, SimulationWithoutNModelStep, IMUSimulationStep, DeepVOimulationStep
+from src.piplines.simulationObject import CNNSimulationStep, RNNSimulationStep, RNNIMUSimulationStep, ClassicSimulationStep, SimulationWithoutNModelStep, IMUSimulationStep, DeepVOimulationStep, UFKSimulationStep
 
 
 class SimulationCNN:
     
-    def __init__(self, model, device, dtrain, norm, visualization=False, loss=None, win_size=10):
+    def __init__(self, model, device, dtrain, norm, visualization=False, loss=None, win_size=10, path_file_of_result=None):
         self.model = model
         self.device = device
         self.dtrain = dtrain
@@ -16,6 +17,7 @@ class SimulationCNN:
         self.visualization = visualization
         self.loss = loss
         self.win_size = win_size
+        self.path_file_of_result = path_file_of_result
         
     def initSimulationObject(self):
     
@@ -30,6 +32,7 @@ class SimulationCNN:
         
         else:
             simualtion = SimulationWithoutNModelStep(
+                model=self.model,
                 device=self.device,
                 visualization=self.visualization
             )
@@ -58,15 +61,45 @@ class SimulationCNN:
                 
                 simulation.get_trajectory_step()
                 
-                if step % self.win_size == 0:
-                    simulation.get_metrice(step)
+                # if step % self.win_size == 0:
+                simulation.get_metrice(step)
             
-                train.set_postfix({'loss': simulation.loss_pose_mean,
+                train.set_postfix({'path_length': float(simulation.path_length),
+                                    'loss': simulation.loss_pose_mean,
                                     'AT RMSE drift': simulation.p_mean,
                                     'AR RMSE drift': simulation.r_mean})
                 
+
             self.trajectory_fact, self.trajectory = simulation.get_position()
             
+            if self.path_file_of_result is not None:
+                self.save_result_in_json(simulation)
+    
+    def save_result_in_json(self, simulation):
+        
+        dct_of_result = {
+            'p_mean': simulation.p_mean,
+            'r_mean': simulation.r_mean,
+            'fact':
+                {
+                    'x': [x[0].item() for x in self.trajectory_fact],
+                    'y': [x[1].item()  for x in self.trajectory_fact],
+                    'z': [-x[2].item()  for x in self.trajectory_fact]
+                }
+        }
+        
+        if self.trajectory is not None:
+            dct_of_result.update({'predict':
+                    {
+                        'x': [x[0].item()  for x in self.trajectory[:-1]],
+                        'y': [x[1].item()  for x in self.trajectory[:-1]],
+                        'z': [-x[2].item()  for x in self.trajectory[:-1]]
+                    },
+            })
+        
+        with open(self.path_file_of_result, 'w', encoding='utf-8') as f:
+            json.dump(dct_of_result, f, ensure_ascii=False, indent=4)
+    
     def get_pictures(self):
 
         fig = go.Figure()
@@ -101,8 +134,8 @@ class SimulationCNN:
         fig.update_layout(
 
 
-            width=1400,
-            height=900,
+            width=2400,
+            height=1600,
 
             font=dict(
                 size=18,
@@ -235,12 +268,38 @@ class SimulationIMU(SimulationCNN):
     
 class SimulationClassic(SimulationCNN):
     
+    def __init__(self, debug=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.debug = debug
+        
     def initSimulationObject(self):
         
         simualtion = ClassicSimulationStep(
             model=self.model,
             device=self.device,
-            win_size=self.win_size
+            win_size=self.win_size,
+            debug=self.debug
+        )
+        
+        return simualtion  
+    
+class SimulationUFK(SimulationClassic):
+    
+    def __init__(self, UKF, gps_window=0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self.UKF = UKF
+        self.gps_window = gps_window
+
+    def initSimulationObject(self):
+        
+        simualtion = UFKSimulationStep(
+            UKF=self.UKF,
+            model=self.model,
+            device=self.device,
+            win_size=self.win_size,
+            debug=self.debug,
+            gps_window=self.gps_window
         )
         
         return simualtion  

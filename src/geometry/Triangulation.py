@@ -8,7 +8,7 @@ class Triangulation:
     Класс восстановления глубины по данным о точках со стереокамер
     '''
     
-    def __init__(self, width, height, new_width, new_height, fov_deg, baseline):
+    def __init__(self, width, height, new_width, new_height, baseline, fov_deg=None, K=None):
         '''
         width, height - ширина, высота изображения в пикселях
         fov_deg - угол обзора камеры (в градусах)
@@ -19,34 +19,61 @@ class Triangulation:
         self.height = height
         self.new_width = new_width
         self.new_height = new_height
-        self.fov_deg = np.deg2rad(fov_deg)
         self.baseline = baseline
+        
+        self.fov_deg = np.deg2rad(fov_deg) if fov_deg is not None else fov_deg
+        self.K_input = K
         
         self._get_focus()
 
     def _get_focus(self):
-        fx_orig = self.width / (2 * np.tan(self.fov_deg / 2))
+        if self.K_input is not None:
+            self.K = self.K_input.astype(np.float64)
 
-        fy_orig = fx_orig # TODO нужно сделать обработку для НЕ квадратных пикселей 
+            self.fx = self.K[0, 0]
+            self.fy = self.K[1, 1]
+            self.cx = self.K[0, 2]
+            self.cy = self.K[1, 2]
         
-        # TODO продумать обработку для неидеальных камер. Алгоритм писался для синтетики, поэтому тут центр ровный
-        cx_orig = self.width / 2
-        cy_orig = self.height / 2
         
+        elif self.fov_deg is not None:
+            fx_orig = self.width / (2 * np.tan(self.fov_deg / 2))
+
+            fy_orig = fx_orig # TODO нужно сделать обработку для НЕ квадратных пикселей 
+            
+            # TODO продумать обработку для неидеальных камер. Алгоритм писался для синтетики, поэтому тут центр ровный
+            cx_orig = self.width / 2
+            cy_orig = self.height / 2
+
+            self.fx = fx_orig
+            self.fy = fy_orig
+            self.cx = cx_orig
+            self.cy = cy_orig
+        
+        else:
+            raise ValueError("Нужно задать либо K, либо fov_deg")
+        
+        self._scale_intrinsincs()
+            
+    def _scale_intrinsincs(self):
+        '''
+        Масштабирование параметров камеры под новое разрешение
+        '''
         scale_x = self.new_width / self.width
         scale_y = self.new_height / self.height
         
         # Масштабируем 
-        self.fx = fx_orig * scale_x
-        self.fy = fy_orig * scale_y
-        self.cx = cx_orig * scale_x
-        self.cy = cy_orig * scale_y
+        self.fx *= scale_x
+        self.fy *= scale_y
+        self.cx *= scale_x
+        self.cy *= scale_y
         
         self.K = np.array([
             [self.fx, 0, self.cx],
             [0, self.fy, self.cy],
             [0, 0, 1]
         ], dtype=np.float64)
+    
         
     def disparity_and_depth(self, left: np.ndarray, right: np.ndarray, disparity_map: np.ndarray = None):
         '''
